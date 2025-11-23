@@ -1,0 +1,5 @@
+{
+  "name": "Fantasy Futbol League",
+  "description": "A fantasy football manager application where you manage your team, simulate matches using AI, and track player performance statistics.",
+  "requestFramePermissions": []
+}
