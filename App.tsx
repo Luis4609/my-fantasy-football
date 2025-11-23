@@ -1,18 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { INITIAL_ROSTER, INITIAL_LEAGUE } from './constants';
-import { Player, LeagueTeam, MatchRecord, Position, PlayerPerformance } from './types';
+import { Player, LeagueTeam, MatchRecord, Position, PlayerPerformance, TeamConfig } from './types';
 import { PlayerCard } from './components/PlayerCard';
 import { PlayerLeaderboard } from './components/PlayerLeaderboard';
 import { MatchInput } from './components/MatchInput';
 import { MatchHistoryList } from './components/MatchHistoryList';
 import { MatchDetail } from './components/MatchDetail';
-import { LayoutDashboard, Users, Trophy, Menu, X, Shirt, PlusCircle, History, Search } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { TeamSettings } from './components/TeamSettings';
+import { LayoutDashboard, Users, Trophy, Menu, X, Shirt, PlusCircle, History, Search, TrendingUp, Target, Activity, Footprints, Settings } from 'lucide-react';
+import { 
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+} from 'recharts';
 
-type View = 'dashboard' | 'roster' | 'leaderboard' | 'match_input' | 'history';
+type View = 'dashboard' | 'roster' | 'leaderboard' | 'match_input' | 'history' | 'settings';
+
+// Helper interface for edit state
+interface PlayerEditState {
+  name?: string;
+  number?: number;
+  position?: Position;
+  // Offsets for stats (Difference between manual value and calculated value)
+  matchesOffset?: number;
+  goalsOffset?: number;
+  assistsOffset?: number;
+  cleanSheetsOffset?: number;
+  pointsOffset?: number;
+}
 
 const App = () => {
+  const [teamConfig, setTeamConfig] = useState<TeamConfig>({ 
+    name: 'My Team', 
+    primaryColor: '#4f46e5', // Indigo 600
+    secondaryColor: '#10b981' // Emerald 500
+  });
+
   const [matchHistory, setMatchHistory] = useState<MatchRecord[]>([]);
+  const [playerEdits, setPlayerEdits] = useState<Record<string, PlayerEditState>>({});
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchRecord | null>(null);
@@ -21,10 +45,10 @@ const App = () => {
   const [rosterSearch, setRosterSearch] = useState('');
   const [rosterFilter, setRosterFilter] = useState<'ALL' | Position>('ALL');
 
-  // Derived state: Roster with Stats
-  const roster = React.useMemo(() => {
-    // Start with clean initial roster
-    const calculatedRoster = INITIAL_ROSTER.map(p => ({ ...p }));
+  // 1. Calculate Base Roster from Match History (Pure Calculation)
+  const baseRoster = React.useMemo(() => {
+    // Start with clean initial roster AND RESET ARRAYS
+    const calculatedRoster = INITIAL_ROSTER.map(p => ({ ...p, form: [] as number[] }));
 
     matchHistory.forEach(match => {
       match.performances.forEach(perf => {
@@ -57,6 +81,9 @@ const App = () => {
           else if (perf.rating >= 7.5) points += 2;
           else if (perf.rating >= 6.5) points += 1;
 
+          // Man of the Match Bonus
+          if (perf.manOfTheMatch) points += 5;
+
           // Update player stats
           player.matchesPlayed += 1;
           player.goals += perf.goals;
@@ -67,7 +94,7 @@ const App = () => {
           
           // Recalculate Average
           const sumRatings = player.form.reduce((a, b) => a + b, 0);
-          player.averageRating = sumRatings / player.form.length;
+          player.averageRating = player.form.length > 0 ? sumRatings / player.form.length : 0;
         }
       });
     });
@@ -75,25 +102,107 @@ const App = () => {
     return calculatedRoster;
   }, [matchHistory]);
 
+  // 2. Apply Manual Edits to create Final Roster
+  const roster = React.useMemo(() => {
+    return baseRoster.map(player => {
+      const edit = playerEdits[player.id];
+      if (!edit) return player;
+
+      return {
+        ...player,
+        name: edit.name ?? player.name,
+        number: edit.number ?? player.number,
+        position: edit.position ?? player.position,
+        matchesPlayed: player.matchesPlayed + (edit.matchesOffset || 0),
+        goals: player.goals + (edit.goalsOffset || 0),
+        assists: player.assists + (edit.assistsOffset || 0),
+        cleanSheets: player.cleanSheets + (edit.cleanSheetsOffset || 0),
+        totalPoints: player.totalPoints + (edit.pointsOffset || 0),
+      };
+    });
+  }, [baseRoster, playerEdits]);
+
   const leagueStats = React.useMemo(() => {
     let played = 0, won = 0, drawn = 0, lost = 0, gf = 0, ga = 0, points = 0;
+    const form: string[] = [];
     
-    matchHistory.forEach(m => {
+    // Sort matches by date for form guide
+    const sortedMatches = [...matchHistory].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    sortedMatches.forEach(m => {
       played++;
       gf += m.myScore;
       ga += m.opponentScore;
-      if (m.myScore > m.opponentScore) { won++; points += 3; }
-      else if (m.myScore === m.opponentScore) { drawn++; points += 1; }
-      else { lost++; }
+      if (m.myScore > m.opponentScore) { 
+        won++; 
+        points += 3; 
+        form.push('W');
+      }
+      else if (m.myScore === m.opponentScore) { 
+        drawn++; 
+        points += 1; 
+        form.push('D');
+      }
+      else { 
+        lost++; 
+        form.push('L');
+      }
     });
 
-    return { played, won, drawn, lost, gf, ga, points };
+    return { played, won, drawn, lost, gf, ga, points, form: form.slice(-5) };
   }, [matchHistory]);
+
+  const teamBalanceData = React.useMemo(() => {
+    const data = {
+      [Position.GK]: 0,
+      [Position.DEF]: 0,
+      [Position.MID]: 0,
+      [Position.FWD]: 0
+    };
+    
+    roster.forEach(p => {
+      if (p.position !== Position.COACH) {
+        data[p.position] += p.totalPoints;
+      }
+    });
+
+    return [
+      { subject: 'GK', A: data[Position.GK], fullMark: 150 },
+      { subject: 'DEF', A: data[Position.DEF], fullMark: 150 },
+      { subject: 'MID', A: data[Position.MID], fullMark: 150 },
+      { subject: 'FWD', A: data[Position.FWD], fullMark: 150 },
+    ];
+  }, [roster]);
 
 
   const handleSaveMatch = (match: MatchRecord) => {
     setMatchHistory(prev => [...prev, match]);
     setCurrentView('dashboard');
+  };
+
+  const handleUpdatePlayer = (id: string, updatedData: Partial<Player>) => {
+    setPlayerEdits(prev => {
+      const basePlayer = baseRoster.find(p => p.id === id);
+      if (!basePlayer) return prev;
+
+      const currentEdit = prev[id] || {};
+      const newEdit: PlayerEditState = { ...currentEdit };
+
+      // Update Basic Info directly
+      if (updatedData.name !== undefined) newEdit.name = updatedData.name;
+      if (updatedData.number !== undefined) newEdit.number = updatedData.number;
+      if (updatedData.position !== undefined) newEdit.position = updatedData.position;
+
+      // Update Stats by calculating OFFSETS
+      // Offset = New Desired Value - Base Calculated Value
+      if (updatedData.matchesPlayed !== undefined) newEdit.matchesOffset = updatedData.matchesPlayed - basePlayer.matchesPlayed;
+      if (updatedData.goals !== undefined) newEdit.goalsOffset = updatedData.goals - basePlayer.goals;
+      if (updatedData.assists !== undefined) newEdit.assistsOffset = updatedData.assists - basePlayer.assists;
+      if (updatedData.cleanSheets !== undefined) newEdit.cleanSheetsOffset = updatedData.cleanSheets - basePlayer.cleanSheets;
+      if (updatedData.totalPoints !== undefined) newEdit.pointsOffset = updatedData.totalPoints - basePlayer.totalPoints;
+
+      return { ...prev, [id]: newEdit };
+    });
   };
 
   const TopPlayersChart = () => {
@@ -114,7 +223,7 @@ const App = () => {
             />
             <Bar dataKey="points" radius={[0, 4, 4, 0]} barSize={20}>
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : '#6366f1'} />
+                <Cell key={`cell-${index}`} fill={index === 0 ? teamConfig.primaryColor : '#6366f1'} />
               ))}
             </Bar>
           </BarChart>
@@ -123,13 +232,43 @@ const App = () => {
     );
   };
 
+  const TeamBalanceRadar = () => {
+    return (
+       <div className="h-64 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <RadarChart cx="50%" cy="50%" outerRadius="80%" data={teamBalanceData}>
+            <PolarGrid stroke="#334155" />
+            <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+            <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={false} axisLine={false} />
+            <Radar
+              name="Points"
+              dataKey="A"
+              stroke={teamConfig.secondaryColor}
+              strokeWidth={2}
+              fill={teamConfig.secondaryColor}
+              fillOpacity={0.4}
+            />
+            <Tooltip 
+              contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }}
+            />
+          </RadarChart>
+        </ResponsiveContainer>
+       </div>
+    )
+  }
+
   const NavItem = ({ view, icon: Icon, label }: { view: View, icon: any, label: string }) => (
     <button
       onClick={() => { setCurrentView(view); setIsMobileMenuOpen(false); setSelectedMatch(null); }}
-      className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-all ${currentView === view ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+      className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-all ${
+        currentView === view 
+          ? 'text-white shadow-lg shadow-black/20 font-bold' 
+          : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+      }`}
+      style={currentView === view ? { backgroundColor: teamConfig.primaryColor } : {}}
     >
       <Icon size={20} />
-      <span className="font-medium">{label}</span>
+      <span>{label}</span>
     </button>
   );
 
@@ -138,11 +277,15 @@ const App = () => {
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 p-6 sticky top-0 h-screen">
         <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+          <div 
+            className="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg transition-colors duration-300"
+            style={{ backgroundColor: teamConfig.primaryColor }}
+          >
             <Shirt className="text-white" size={24} />
           </div>
-          <div>
-            <h1 className="font-bold text-white leading-tight">Fantasy<br/>Futbol</h1>
+          <div className="flex flex-col">
+            <h1 className="font-bold text-white text-lg leading-tight truncate max-w-[140px]" title={teamConfig.name}>{teamConfig.name}</h1>
+            <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Manager Mode</span>
           </div>
         </div>
         
@@ -160,6 +303,10 @@ const App = () => {
             <span className="font-bold">Add Match</span>
           </button>
         </nav>
+
+        <div className="mt-auto border-t border-slate-800 pt-4">
+           <NavItem view="settings" icon={Settings} label="Settings" />
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -167,10 +314,10 @@ const App = () => {
         {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center">
+             <div className="w-8 h-8 rounded flex items-center justify-center" style={{ backgroundColor: teamConfig.primaryColor }}>
               <Shirt className="text-white" size={18} />
             </div>
-            <span className="font-bold text-white">Fantasy Futbol</span>
+            <span className="font-bold text-white truncate max-w-[200px]">{teamConfig.name}</span>
           </div>
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-300">
             {isMobileMenuOpen ? <X /> : <Menu />}
@@ -185,82 +332,156 @@ const App = () => {
              <NavItem view="history" icon={History} label="Match History" />
              <NavItem view="leaderboard" icon={Trophy} label="Performance Table" />
              <NavItem view="match_input" icon={PlusCircle} label="Add Match Data" />
+             <NavItem view="settings" icon={Settings} label="Settings" />
           </div>
         )}
 
         <div className="p-4 md:p-8 max-w-7xl mx-auto w-full">
           {currentView === 'dashboard' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl p-6 text-white shadow-lg">
-                   <h3 className="text-indigo-200 text-sm font-medium mb-1">Season Record</h3>
-                   <div className="flex items-end gap-2">
-                     <span className="text-5xl font-black">{leagueStats.points}</span>
-                     <span className="text-indigo-200 mb-2">pts</span>
-                   </div>
-                   <div className="mt-4 flex gap-4 text-sm font-medium opacity-80">
-                     <span>W: {leagueStats.won}</span>
-                     <span>D: {leagueStats.drawn}</span>
-                     <span>L: {leagueStats.lost}</span>
-                   </div>
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex justify-between items-end">
+                <div>
+                   <h2 className="text-2xl font-bold text-white">Dashboard</h2>
+                   <p className="text-slate-400 text-sm mt-1">Season Overview & {teamConfig.name} Performance</p>
                 </div>
-                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
-                   <h3 className="text-slate-400 text-sm font-medium mb-1">Total Team Fantasy Points</h3>
-                   <span className="text-4xl font-bold text-white">
-                     {roster.reduce((acc, curr) => acc + curr.totalPoints, 0)}
-                   </span>
+              </div>
+
+              {/* Top Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Card 1: Record & Form */}
+                <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-2xl p-5 relative overflow-hidden">
+                  <div className="relative z-10">
+                    <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Season Record</h3>
+                    <div className="flex items-baseline gap-2 mb-3">
+                      <span className="text-3xl font-black text-white">{leagueStats.points}</span>
+                      <span className="text-sm font-bold" style={{ color: teamConfig.primaryColor }}>PTS</span>
+                    </div>
+                    <div className="flex gap-1">
+                      {leagueStats.form.length > 0 ? leagueStats.form.map((res, i) => (
+                        <div key={i} className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${
+                          res === 'W' ? 'bg-green-500/20 text-green-400' : res === 'D' ? 'bg-slate-500/20 text-slate-400' : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {res}
+                        </div>
+                      )) : <span className="text-xs text-slate-500">No games yet</span>}
+                    </div>
+                  </div>
+                  <Activity className="absolute -bottom-4 -right-4 text-slate-800 opacity-50" size={80} />
                 </div>
-                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
-                   <h3 className="text-slate-400 text-sm font-medium mb-1">Club Top Scorer</h3>
+
+                {/* Card 2: Total Fantasy Points */}
+                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+                   <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Total Fantasy Points</h3>
+                   <div className="flex items-center gap-3">
+                     <span className="text-3xl font-black text-white">
+                       {roster.reduce((acc, curr) => acc + curr.totalPoints, 0)}
+                     </span>
+                     <TrendingUp className="text-emerald-400" size={20} />
+                   </div>
+                   <p className="text-xs text-slate-500 mt-2">Combined squad total</p>
+                </div>
+
+                {/* Card 3: Top Scorer */}
+                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+                   <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Golden Boot</h3>
                    {(() => {
                      const topScorer = [...roster].sort((a, b) => b.goals - a.goals)[0];
                      return (
-                       <div className="flex items-center justify-between mt-2">
-                         <span className="text-2xl font-bold text-white truncate">{topScorer?.goals > 0 ? topScorer.name : 'N/A'}</span>
-                         <span className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-lg text-lg font-bold">{topScorer?.goals || 0} G</span>
+                       <div className="flex flex-col">
+                         <div className="flex justify-between items-center mb-1">
+                            <span className="text-xl font-bold text-white truncate">{topScorer?.goals > 0 ? topScorer.name : 'N/A'}</span>
+                            <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-sm font-bold">{topScorer?.goals || 0} G</span>
+                         </div>
+                         <div className="text-xs text-slate-500">{topScorer?.position || '-'}</div>
+                       </div>
+                     )
+                   })()}
+                </div>
+
+                {/* Card 4: Top Assister */}
+                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+                   <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Playmaker</h3>
+                   {(() => {
+                     const topAssister = [...roster].sort((a, b) => b.assists - a.assists)[0];
+                     return (
+                       <div className="flex flex-col">
+                         <div className="flex justify-between items-center mb-1">
+                            <span className="text-xl font-bold text-white truncate">{topAssister?.assists > 0 ? topAssister.name : 'N/A'}</span>
+                            <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-sm font-bold">{topAssister?.assists || 0} A</span>
+                         </div>
+                         <div className="text-xs text-slate-500">{topAssister?.position || '-'}</div>
                        </div>
                      )
                    })()}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                 <div className="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-2xl p-6">
-                    <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                      <Users size={18} className="text-indigo-400" /> MVP Standings (Points)
+              {/* Charts Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                 {/* Left: MVP Bar Chart */}
+                 <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+                    <h3 className="text-white font-bold mb-6 flex items-center gap-2">
+                      <Users size={18} style={{ color: teamConfig.primaryColor }} /> MVP Standings
                     </h3>
                     <TopPlayersChart />
                  </div>
-                 <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 flex flex-col">
-                    <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                      <History size={18} className="text-slate-400" /> Recent Matches
+
+                 {/* Right: Radar Chart (New) */}
+                 <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+                    <h3 className="text-white font-bold mb-6 flex items-center gap-2">
+                      <Target size={18} className="text-purple-400" /> Team Balance (Points)
                     </h3>
-                    {matchHistory.length === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-slate-500 text-sm py-8">
-                        <p>No matches played yet.</p>
-                        <button onClick={() => setCurrentView('match_input')} className="mt-2 text-indigo-400 hover:text-indigo-300">Add your first match</button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {matchHistory.slice().reverse().slice(0, 5).map(match => (
-                          <div 
-                            key={match.id} 
-                            onClick={() => { setSelectedMatch(match); setCurrentView('history'); }}
-                            className="flex justify-between items-center p-3 bg-slate-700/30 rounded-lg cursor-pointer hover:bg-slate-700/50 transition-colors"
-                          >
-                            <span className="font-semibold text-slate-300">{match.opponent}</span>
-                            <div className={`font-bold font-mono px-2 py-1 rounded ${
-                              match.myScore > match.opponentScore ? 'bg-green-500/20 text-green-400' :
-                              match.myScore === match.opponentScore ? 'bg-slate-500/20 text-slate-400' :
-                              'bg-red-500/20 text-red-400'
-                            }`}>
-                              {match.myScore} - {match.opponentScore}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <TeamBalanceRadar />
                  </div>
+              </div>
+
+              {/* Recent Activity */}
+              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                  <History size={18} className="text-slate-400" /> Recent Results
+                </h3>
+                {matchHistory.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center text-slate-500 text-sm py-8 border border-dashed border-slate-700 rounded-xl">
+                    <Footprints size={24} className="mb-2 opacity-50" />
+                    <p>No matches played yet.</p>
+                    <button onClick={() => setCurrentView('match_input')} className="mt-2 text-indigo-400 hover:text-indigo-300">Add your first match</button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {matchHistory.slice().reverse().slice(0, 6).map(match => (
+                      <div 
+                        key={match.id} 
+                        onClick={() => { setSelectedMatch(match); setCurrentView('history'); }}
+                        className="group flex flex-col p-4 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500/50 hover:shadow-lg hover:shadow-indigo-500/10 transition-all"
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">
+                            {new Date(match.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                          <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                            match.myScore > match.opponentScore ? 'bg-green-500/10 text-green-400' :
+                            match.myScore === match.opponentScore ? 'bg-slate-500/10 text-slate-400' :
+                            'bg-red-500/10 text-red-400'
+                          }`}>
+                            {match.myScore > match.opponentScore ? 'Win' : match.myScore === match.opponentScore ? 'Draw' : 'Loss'}
+                          </div>
+                        </div>
+                        
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <div className="font-bold text-slate-200">{teamConfig.name}</div>
+                            <div className="text-sm text-slate-400">{match.opponent}</div>
+                          </div>
+                          <div className="flex gap-1 font-mono text-xl font-bold">
+                            <span className={match.myScore > match.opponentScore ? 'text-green-400' : 'text-white'}>{match.myScore}</span>
+                            <span className="text-slate-600">:</span>
+                            <span className={match.opponentScore > match.myScore ? 'text-red-400' : 'text-white'}>{match.opponentScore}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -300,9 +521,10 @@ const App = () => {
                          onClick={() => setRosterFilter(filter.id as any)}
                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                            rosterFilter === filter.id 
-                             ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
+                             ? 'text-white shadow-lg shadow-black/20' 
                              : 'text-slate-400 hover:text-white hover:bg-slate-800'
                          }`}
+                         style={rosterFilter === filter.id ? { backgroundColor: teamConfig.primaryColor } : {}}
                        >
                          {filter.label}
                        </button>
@@ -319,7 +541,7 @@ const App = () => {
                     return matchesSearch && matchesFilter;
                   })
                   .map(player => (
-                    <PlayerCard key={player.id} player={player} />
+                    <PlayerCard key={player.id} player={player} onUpdate={handleUpdatePlayer} />
                   ))}
               </div>
 
@@ -353,6 +575,7 @@ const App = () => {
              <div className="h-[calc(100vh-120px)]">
               <MatchInput 
                 roster={roster} 
+                teamName={teamConfig.name}
                 onSave={handleSaveMatch} 
                 onCancel={() => setCurrentView('dashboard')} 
               />
@@ -361,10 +584,14 @@ const App = () => {
 
           {currentView === 'history' && (
             selectedMatch ? (
-              <MatchDetail match={selectedMatch} roster={roster} onBack={() => setSelectedMatch(null)} />
+              <MatchDetail match={selectedMatch} roster={roster} teamName={teamConfig.name} onBack={() => setSelectedMatch(null)} />
             ) : (
-              <MatchHistoryList matches={matchHistory} onSelectMatch={setSelectedMatch} />
+              <MatchHistoryList matches={matchHistory} teamName={teamConfig.name} onSelectMatch={setSelectedMatch} />
             )
+          )}
+
+          {currentView === 'settings' && (
+            <TeamSettings config={teamConfig} onSave={setTeamConfig} />
           )}
         </div>
       </main>

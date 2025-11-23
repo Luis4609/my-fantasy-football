@@ -7,6 +7,12 @@ export enum Position {
   COACH = 'Mister'
 }
 
+export interface TeamConfig {
+  name: string;
+  primaryColor: string;
+  secondaryColor: string;
+}
+
 export interface Player {
   id: string;
   name: string;

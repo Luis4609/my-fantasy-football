@@ -5,10 +5,11 @@ import { ArrowLeft, Calendar, TrendingUp, Star } from 'lucide-react';
 interface MatchDetailProps {
   match: MatchRecord;
   roster: Player[];
+  teamName: string;
   onBack: () => void;
 }
 
-export const MatchDetail: React.FC<MatchDetailProps> = ({ match, roster, onBack }) => {
+export const MatchDetail: React.FC<MatchDetailProps> = ({ match, roster, teamName, onBack }) => {
   const getPlayer = (id: string) => roster.find(p => p.id === id);
 
   return (
@@ -30,7 +31,7 @@ export const MatchDetail: React.FC<MatchDetailProps> = ({ match, roster, onBack 
           
           <div className="flex justify-center items-center gap-8 md:gap-16">
             <div className="text-right flex-1">
-              <span className="block text-2xl md:text-4xl font-black text-white">My Team</span>
+              <span className="block text-2xl md:text-4xl font-black text-white">{teamName}</span>
             </div>
             
             <div className="flex items-center gap-4 bg-slate-950/50 px-6 py-3 rounded-xl border border-slate-800/50 backdrop-blur-sm">

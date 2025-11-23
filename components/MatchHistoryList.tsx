@@ -1,13 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MatchRecord } from '../types';
-import { Calendar, ChevronRight, Trophy } from 'lucide-react';
+import { Calendar, ChevronRight, Trophy, ArrowUpDown } from 'lucide-react';
 
 interface MatchHistoryListProps {
   matches: MatchRecord[];
+  teamName: string;
   onSelectMatch: (match: MatchRecord) => void;
 }
 
-export const MatchHistoryList: React.FC<MatchHistoryListProps> = ({ matches, onSelectMatch }) => {
+type SortField = 'date' | 'myScore' | 'opponentScore';
+
+export const MatchHistoryList: React.FC<MatchHistoryListProps> = ({ matches, teamName, onSelectMatch }) => {
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDesc, setSortDesc] = useState(true);
+
   if (matches.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-500 bg-slate-800/30 rounded-2xl border border-slate-700/50 border-dashed">
@@ -18,12 +24,60 @@ export const MatchHistoryList: React.FC<MatchHistoryListProps> = ({ matches, onS
     );
   }
 
-  // Sort by date descending
-  const sortedMatches = [...matches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const sortedMatches = [...matches].sort((a, b) => {
+    let valA: any = a[sortField];
+    let valB: any = b[sortField];
+
+    if (sortField === 'date') {
+      valA = new Date(a.date).getTime();
+      valB = new Date(b.date).getTime();
+    }
+
+    if (valA < valB) return sortDesc ? 1 : -1;
+    if (valA > valB) return sortDesc ? -1 : 1;
+    return 0;
+  });
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDesc(!sortDesc);
+    } else {
+      setSortField(field);
+      setSortDesc(true); // Default to desc (High score / Recent date)
+    }
+  };
+
+  const SortButton = ({ field, label }: { field: SortField, label: string }) => (
+    <button 
+      onClick={() => handleSort(field)}
+      className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${
+        sortField === field 
+          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
+          : 'text-slate-400 hover:text-white hover:bg-slate-700'
+      }`}
+    >
+      {label} 
+      <ArrowUpDown 
+        size={12} 
+        className={`transition-transform duration-200 ${
+          sortField === field ? 'opacity-100' : 'opacity-40'
+        } ${sortField === field && !sortDesc ? 'rotate-180' : ''}`} 
+      />
+    </button>
+  );
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-white mb-6">Match History</h2>
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-2">
+        <h2 className="text-2xl font-bold text-white">Match History</h2>
+        
+        <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-700 gap-1">
+           <SortButton field="date" label="Date" />
+           <SortButton field="myScore" label="My Score" />
+           <SortButton field="opponentScore" label="Opp. Score" />
+        </div>
+      </div>
+
       <div className="grid gap-3">
         {sortedMatches.map((match) => {
           const isWin = match.myScore > match.opponentScore;

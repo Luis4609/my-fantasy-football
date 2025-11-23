@@ -1,15 +1,17 @@
 import React, { useState, useRef } from 'react';
 import { Player, Position, MatchRecord, PlayerPerformance } from '../types';
+import { OPPONENTS } from '../constants';
 import { Save, Calendar, Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Star } from 'lucide-react';
 import { read, utils } from 'xlsx';
 
 interface MatchInputProps {
   roster: Player[];
+  teamName: string;
   onSave: (match: MatchRecord) => void;
   onCancel: () => void;
 }
 
-export const MatchInput: React.FC<MatchInputProps> = ({ roster, onSave, onCancel }) => {
+export const MatchInput: React.FC<MatchInputProps> = ({ roster, teamName, onSave, onCancel }) => {
   const [opponent, setOpponent] = useState('');
   const [myScore, setMyScore] = useState<number>(0);
   const [oppScore, setOppScore] = useState<number>(0);
@@ -184,11 +186,17 @@ export const MatchInput: React.FC<MatchInputProps> = ({ roster, onSave, onCancel
             <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Opponent</label>
             <input 
               type="text" 
+              list="opponents-list"
               value={opponent}
               onChange={(e) => setOpponent(e.target.value)}
-              placeholder="e.g. Thunder FC"
+              placeholder="Select or type team name..."
               className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
             />
+            <datalist id="opponents-list">
+              {OPPONENTS.map(team => (
+                <option key={team} value={team} />
+              ))}
+            </datalist>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Date</label>
@@ -204,7 +212,7 @@ export const MatchInput: React.FC<MatchInputProps> = ({ roster, onSave, onCancel
           </div>
           <div className="flex gap-4 items-end">
             <div className="flex-1">
-              <label className="block text-xs font-bold text-indigo-400 uppercase mb-2">My Score</label>
+              <label className="block text-xs font-bold uppercase mb-2 truncate" style={{ color: '#818cf8' }}>{teamName}</label>
               <input 
                 type="number" 
                 min="0"
