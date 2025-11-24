@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { INITIAL_ROSTER, INITIAL_LEAGUE } from './constants';
-import { Player, LeagueTeam, MatchRecord, Position, PlayerPerformance, TeamConfig } from './types';
+import { INITIAL_ROSTER } from './constants';
+import { Player, MatchRecord, Position, PlayerPerformance, TeamConfig } from './types';
 import { PlayerCard } from './components/PlayerCard';
 import { PlayerLeaderboard } from './components/PlayerLeaderboard';
 import { MatchInput } from './components/MatchInput';
@@ -8,7 +8,7 @@ import { MatchHistoryList } from './components/MatchHistoryList';
 import { MatchDetail } from './components/MatchDetail';
 import { TeamSettings } from './components/TeamSettings';
 import { LayoutDashboard, Users, Trophy, Menu, X, Shirt, PlusCircle, History, Search, TrendingUp, Target, Activity, Footprints, Settings } from 'lucide-react';
-import { 
+import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
@@ -29,8 +29,8 @@ interface PlayerEditState {
 }
 
 const App = () => {
-  const [teamConfig, setTeamConfig] = useState<TeamConfig>({ 
-    name: 'My Team', 
+  const [teamConfig, setTeamConfig] = useState<TeamConfig>({
+    name: 'My Team',
     primaryColor: '#4f46e5', // Indigo 600
     secondaryColor: '#10b981' // Emerald 500
   });
@@ -40,7 +40,7 @@ const App = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchRecord | null>(null);
-  
+
   // Roster Filter State
   const [rosterSearch, setRosterSearch] = useState('');
   const [rosterFilter, setRosterFilter] = useState<'ALL' | Position>('ALL');
@@ -58,7 +58,7 @@ const App = () => {
           let points = 0;
           if (perf.minutes > 0) points += 1; // Appearance
           if (perf.minutes >= 60) points += 1; // 60+ mins
-          
+
           // Goals
           if (player.position === Position.FWD) points += perf.goals * 4;
           else if (player.position === Position.MID) points += perf.goals * 5;
@@ -91,7 +91,7 @@ const App = () => {
           player.totalPoints += points;
           player.cleanSheets += ((player.position === Position.DEF || player.position === Position.GK) && match.opponentScore === 0 && perf.minutes >= 60) ? 1 : 0;
           player.form.push(perf.rating);
-          
+
           // Recalculate Average
           const sumRatings = player.form.reduce((a, b) => a + b, 0);
           player.averageRating = player.form.length > 0 ? sumRatings / player.form.length : 0;
@@ -125,7 +125,7 @@ const App = () => {
   const leagueStats = React.useMemo(() => {
     let played = 0, won = 0, drawn = 0, lost = 0, gf = 0, ga = 0, points = 0;
     const form: string[] = [];
-    
+
     // Sort matches by date for form guide
     const sortedMatches = [...matchHistory].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -133,18 +133,18 @@ const App = () => {
       played++;
       gf += m.myScore;
       ga += m.opponentScore;
-      if (m.myScore > m.opponentScore) { 
-        won++; 
-        points += 3; 
+      if (m.myScore > m.opponentScore) {
+        won++;
+        points += 3;
         form.push('W');
       }
-      else if (m.myScore === m.opponentScore) { 
-        drawn++; 
-        points += 1; 
+      else if (m.myScore === m.opponentScore) {
+        drawn++;
+        points += 1;
         form.push('D');
       }
-      else { 
-        lost++; 
+      else {
+        lost++;
         form.push('L');
       }
     });
@@ -159,7 +159,7 @@ const App = () => {
       [Position.MID]: 0,
       [Position.FWD]: 0
     };
-    
+
     roster.forEach(p => {
       if (p.position !== Position.COACH) {
         data[p.position] += p.totalPoints;
@@ -217,7 +217,7 @@ const App = () => {
           <BarChart data={data} layout="vertical" margin={{ left: 20 }}>
             <XAxis type="number" hide />
             <YAxis dataKey="name" type="category" width={80} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-            <Tooltip 
+            <Tooltip
               contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }}
               cursor={{ fill: 'transparent' }}
             />
@@ -234,7 +234,7 @@ const App = () => {
 
   const TeamBalanceRadar = () => {
     return (
-       <div className="h-64 w-full">
+      <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart cx="50%" cy="50%" outerRadius="80%" data={teamBalanceData}>
             <PolarGrid stroke="#334155" />
@@ -248,23 +248,22 @@ const App = () => {
               fill={teamConfig.secondaryColor}
               fillOpacity={0.4}
             />
-            <Tooltip 
+            <Tooltip
               contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }}
             />
           </RadarChart>
         </ResponsiveContainer>
-       </div>
+      </div>
     )
   }
 
   const NavItem = ({ view, icon: Icon, label }: { view: View, icon: any, label: string }) => (
     <button
       onClick={() => { setCurrentView(view); setIsMobileMenuOpen(false); setSelectedMatch(null); }}
-      className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-all ${
-        currentView === view 
-          ? 'text-white shadow-lg shadow-black/20 font-bold' 
-          : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-      }`}
+      className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-all ${currentView === view
+        ? 'text-white shadow-lg shadow-black/20 font-bold'
+        : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+        }`}
       style={currentView === view ? { backgroundColor: teamConfig.primaryColor } : {}}
     >
       <Icon size={20} />
@@ -277,7 +276,7 @@ const App = () => {
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 p-6 sticky top-0 h-screen">
         <div className="flex items-center gap-3 mb-10 px-2">
-          <div 
+          <div
             className="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg transition-colors duration-300"
             style={{ backgroundColor: teamConfig.primaryColor }}
           >
@@ -288,7 +287,7 @@ const App = () => {
             <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Manager Mode</span>
           </div>
         </div>
-        
+
         <nav className="flex-1 space-y-2">
           <NavItem view="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavItem view="roster" icon={Users} label="My Team" />
@@ -305,7 +304,7 @@ const App = () => {
         </nav>
 
         <div className="mt-auto border-t border-slate-800 pt-4">
-           <NavItem view="settings" icon={Settings} label="Settings" />
+          <NavItem view="settings" icon={Settings} label="Settings" />
         </div>
       </aside>
 
@@ -314,7 +313,7 @@ const App = () => {
         {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded flex items-center justify-center" style={{ backgroundColor: teamConfig.primaryColor }}>
+            <div className="w-8 h-8 rounded flex items-center justify-center" style={{ backgroundColor: teamConfig.primaryColor }}>
               <Shirt className="text-white" size={18} />
             </div>
             <span className="font-bold text-white truncate max-w-[200px]">{teamConfig.name}</span>
@@ -327,12 +326,12 @@ const App = () => {
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
           <div className="md:hidden fixed inset-0 bg-slate-900 z-40 pt-20 px-6 space-y-4">
-             <NavItem view="dashboard" icon={LayoutDashboard} label="Dashboard" />
-             <NavItem view="roster" icon={Users} label="My Team" />
-             <NavItem view="history" icon={History} label="Match History" />
-             <NavItem view="leaderboard" icon={Trophy} label="Performance Table" />
-             <NavItem view="match_input" icon={PlusCircle} label="Add Match Data" />
-             <NavItem view="settings" icon={Settings} label="Settings" />
+            <NavItem view="dashboard" icon={LayoutDashboard} label="Dashboard" />
+            <NavItem view="roster" icon={Users} label="My Team" />
+            <NavItem view="history" icon={History} label="Match History" />
+            <NavItem view="leaderboard" icon={Trophy} label="Performance Table" />
+            <NavItem view="match_input" icon={PlusCircle} label="Add Match Data" />
+            <NavItem view="settings" icon={Settings} label="Settings" />
           </div>
         )}
 
@@ -341,8 +340,8 @@ const App = () => {
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="flex justify-between items-end">
                 <div>
-                   <h2 className="text-2xl font-bold text-white">Dashboard</h2>
-                   <p className="text-slate-400 text-sm mt-1">Season Overview & {teamConfig.name} Performance</p>
+                  <h2 className="text-2xl font-bold text-white">Dashboard</h2>
+                  <p className="text-slate-400 text-sm mt-1">Season Overview & {teamConfig.name} Performance</p>
                 </div>
               </div>
 
@@ -358,9 +357,8 @@ const App = () => {
                     </div>
                     <div className="flex gap-1">
                       {leagueStats.form.length > 0 ? leagueStats.form.map((res, i) => (
-                        <div key={i} className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${
-                          res === 'W' ? 'bg-green-500/20 text-green-400' : res === 'D' ? 'bg-slate-500/20 text-slate-400' : 'bg-red-500/20 text-red-400'
-                        }`}>
+                        <div key={i} className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${res === 'W' ? 'bg-green-500/20 text-green-400' : res === 'D' ? 'bg-slate-500/20 text-slate-400' : 'bg-red-500/20 text-red-400'
+                          }`}>
                           {res}
                         </div>
                       )) : <span className="text-xs text-slate-500">No games yet</span>}
@@ -371,68 +369,68 @@ const App = () => {
 
                 {/* Card 2: Total Fantasy Points */}
                 <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
-                   <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Total Fantasy Points</h3>
-                   <div className="flex items-center gap-3">
-                     <span className="text-3xl font-black text-white">
-                       {roster.reduce((acc, curr) => acc + curr.totalPoints, 0)}
-                     </span>
-                     <TrendingUp className="text-emerald-400" size={20} />
-                   </div>
-                   <p className="text-xs text-slate-500 mt-2">Combined squad total</p>
+                  <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Total Fantasy Points</h3>
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl font-black text-white">
+                      {roster.reduce((acc, curr) => acc + curr.totalPoints, 0)}
+                    </span>
+                    <TrendingUp className="text-emerald-400" size={20} />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">Combined squad total</p>
                 </div>
 
                 {/* Card 3: Top Scorer */}
                 <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
-                   <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Golden Boot</h3>
-                   {(() => {
-                     const topScorer = [...roster].sort((a, b) => b.goals - a.goals)[0];
-                     return (
-                       <div className="flex flex-col">
-                         <div className="flex justify-between items-center mb-1">
-                            <span className="text-xl font-bold text-white truncate">{topScorer?.goals > 0 ? topScorer.name : 'N/A'}</span>
-                            <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-sm font-bold">{topScorer?.goals || 0} G</span>
-                         </div>
-                         <div className="text-xs text-slate-500">{topScorer?.position || '-'}</div>
-                       </div>
-                     )
-                   })()}
+                  <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Golden Boot</h3>
+                  {(() => {
+                    const topScorer = [...roster].sort((a, b) => b.goals - a.goals)[0];
+                    return (
+                      <div className="flex flex-col">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xl font-bold text-white truncate">{topScorer?.goals > 0 ? topScorer.name : 'N/A'}</span>
+                          <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-sm font-bold">{topScorer?.goals || 0} G</span>
+                        </div>
+                        <div className="text-xs text-slate-500">{topScorer?.position || '-'}</div>
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 {/* Card 4: Top Assister */}
                 <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
-                   <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Playmaker</h3>
-                   {(() => {
-                     const topAssister = [...roster].sort((a, b) => b.assists - a.assists)[0];
-                     return (
-                       <div className="flex flex-col">
-                         <div className="flex justify-between items-center mb-1">
-                            <span className="text-xl font-bold text-white truncate">{topAssister?.assists > 0 ? topAssister.name : 'N/A'}</span>
-                            <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-sm font-bold">{topAssister?.assists || 0} A</span>
-                         </div>
-                         <div className="text-xs text-slate-500">{topAssister?.position || '-'}</div>
-                       </div>
-                     )
-                   })()}
+                  <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Playmaker</h3>
+                  {(() => {
+                    const topAssister = [...roster].sort((a, b) => b.assists - a.assists)[0];
+                    return (
+                      <div className="flex flex-col">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xl font-bold text-white truncate">{topAssister?.assists > 0 ? topAssister.name : 'N/A'}</span>
+                          <span className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-sm font-bold">{topAssister?.assists || 0} A</span>
+                        </div>
+                        <div className="text-xs text-slate-500">{topAssister?.position || '-'}</div>
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
 
               {/* Charts Section */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 {/* Left: MVP Bar Chart */}
-                 <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
-                    <h3 className="text-white font-bold mb-6 flex items-center gap-2">
-                      <Users size={18} style={{ color: teamConfig.primaryColor }} /> MVP Standings
-                    </h3>
-                    <TopPlayersChart />
-                 </div>
+                {/* Left: MVP Bar Chart */}
+                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+                  <h3 className="text-white font-bold mb-6 flex items-center gap-2">
+                    <Users size={18} style={{ color: teamConfig.primaryColor }} /> MVP Standings
+                  </h3>
+                  <TopPlayersChart />
+                </div>
 
-                 {/* Right: Radar Chart (New) */}
-                 <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
-                    <h3 className="text-white font-bold mb-6 flex items-center gap-2">
-                      <Target size={18} className="text-purple-400" /> Team Balance (Points)
-                    </h3>
-                    <TeamBalanceRadar />
-                 </div>
+                {/* Right: Radar Chart (New) */}
+                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+                  <h3 className="text-white font-bold mb-6 flex items-center gap-2">
+                    <Target size={18} className="text-purple-400" /> Team Balance (Points)
+                  </h3>
+                  <TeamBalanceRadar />
+                </div>
               </div>
 
               {/* Recent Activity */}
@@ -449,8 +447,8 @@ const App = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {matchHistory.slice().reverse().slice(0, 6).map(match => (
-                      <div 
-                        key={match.id} 
+                      <div
+                        key={match.id}
                         onClick={() => { setSelectedMatch(match); setCurrentView('history'); }}
                         className="group flex flex-col p-4 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:border-indigo-500/50 hover:shadow-lg hover:shadow-indigo-500/10 transition-all"
                       >
@@ -458,15 +456,14 @@ const App = () => {
                           <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">
                             {new Date(match.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                           </span>
-                          <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
-                            match.myScore > match.opponentScore ? 'bg-green-500/10 text-green-400' :
+                          <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${match.myScore > match.opponentScore ? 'bg-green-500/10 text-green-400' :
                             match.myScore === match.opponentScore ? 'bg-slate-500/10 text-slate-400' :
-                            'bg-red-500/10 text-red-400'
-                          }`}>
+                              'bg-red-500/10 text-red-400'
+                            }`}>
                             {match.myScore > match.opponentScore ? 'Win' : match.myScore === match.opponentScore ? 'Draw' : 'Loss'}
                           </div>
                         </div>
-                        
+
                         <div className="flex justify-between items-center">
                           <div>
                             <div className="font-bold text-slate-200">{teamConfig.name}</div>
@@ -498,15 +495,15 @@ const App = () => {
                   {/* Search */}
                   <div className="relative group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={16} />
-                    <input 
-                      type="text" 
-                      placeholder="Search player..." 
+                    <input
+                      type="text"
+                      placeholder="Search player..."
                       value={rosterSearch}
                       onChange={(e) => setRosterSearch(e.target.value)}
                       className="w-full sm:w-64 bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all placeholder:text-slate-600"
                     />
                   </div>
-                  
+
                   {/* Filter */}
                   <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-700 overflow-x-auto no-scrollbar">
                     {[
@@ -516,18 +513,17 @@ const App = () => {
                       { id: Position.MID, label: 'MID' },
                       { id: Position.FWD, label: 'FWD' }
                     ].map((filter) => (
-                       <button
-                         key={filter.id}
-                         onClick={() => setRosterFilter(filter.id as any)}
-                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                           rosterFilter === filter.id 
-                             ? 'text-white shadow-lg shadow-black/20' 
-                             : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                         }`}
-                         style={rosterFilter === filter.id ? { backgroundColor: teamConfig.primaryColor } : {}}
-                       >
-                         {filter.label}
-                       </button>
+                      <button
+                        key={filter.id}
+                        onClick={() => setRosterFilter(filter.id as any)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${rosterFilter === filter.id
+                          ? 'text-white shadow-lg shadow-black/20'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                          }`}
+                        style={rosterFilter === filter.id ? { backgroundColor: teamConfig.primaryColor } : {}}
+                      >
+                        {filter.label}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -550,34 +546,34 @@ const App = () => {
                 const matchesFilter = rosterFilter === 'ALL' || player.position === rosterFilter;
                 return matchesSearch && matchesFilter;
               }).length === 0 && (
-                 <div className="flex flex-col items-center justify-center py-16 text-slate-500 bg-slate-900/30 rounded-2xl border border-slate-800 border-dashed">
+                  <div className="flex flex-col items-center justify-center py-16 text-slate-500 bg-slate-900/30 rounded-2xl border border-slate-800 border-dashed">
                     <Search size={32} className="mb-3 opacity-20" />
                     <p>No players found matching your criteria.</p>
-                    <button 
+                    <button
                       onClick={() => { setRosterSearch(''); setRosterFilter('ALL'); }}
                       className="mt-2 text-indigo-400 hover:text-indigo-300 text-sm font-medium"
                     >
                       Clear filters
                     </button>
-                 </div>
-              )}
+                  </div>
+                )}
             </div>
           )}
 
           {currentView === 'leaderboard' && (
-             <div>
+            <div>
               <h2 className="text-2xl font-bold text-white mb-6">Player Performance Table</h2>
               <PlayerLeaderboard roster={roster} />
             </div>
           )}
 
           {currentView === 'match_input' && (
-             <div className="h-[calc(100vh-120px)]">
-              <MatchInput 
-                roster={roster} 
+            <div className="h-[calc(100vh-120px)]">
+              <MatchInput
+                roster={roster}
                 teamName={teamConfig.name}
-                onSave={handleSaveMatch} 
-                onCancel={() => setCurrentView('dashboard')} 
+                onSave={handleSaveMatch}
+                onCancel={() => setCurrentView('dashboard')}
               />
             </div>
           )}

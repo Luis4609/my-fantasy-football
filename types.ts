@@ -48,40 +48,6 @@ export interface MatchRecord {
   performances: PlayerPerformance[];
 }
 
-export interface LeagueTeam {
-  name: string;
-  played: number;
-  won: number;
-  drawn: number;
-  lost: number;
-  gf: number;
-  ga: number;
-  points: number;
-}
 
-export interface MatchStats {
-  name: string;
-  goals: number;
-  assists: number;
-  saves: number;
-  rating: number;
-  yellowCard: boolean;
-  redCard: boolean;
-  minutesPlayed: number;
-}
 
-export interface MatchEvent {
-  minute: number;
-  type: string;
-  description: string;
-  playername?: string;
-}
 
-export interface MatchResult {
-  opponent: string;
-  myScore: number;
-  opponentScore: number;
-  summary: string;
-  events: MatchEvent[];
-  playerStats: Record<string, MatchStats>;
-}

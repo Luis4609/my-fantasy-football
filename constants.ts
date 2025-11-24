@@ -1,4 +1,4 @@
-import { Player, Position, LeagueTeam } from './types';
+import { Player, Position } from './types';
 
 export const INITIAL_ROSTER: Player[] = [
   { id: '1', name: 'Ignacio', number: 1, position: Position.COACH, matchesPlayed: 0, goals: 0, assists: 0, cleanSheets: 0, totalPoints: 0, averageRating: 0, form: [] },
@@ -23,9 +23,4 @@ export const INITIAL_ROSTER: Player[] = [
 
 export const OPPONENTS = [
   "Thunder FC", "Real Vibe", "Atletico Coding", "Dynamo Data", "Sporting Server", "Inter Interface", "Rapid React"
-];
-
-export const INITIAL_LEAGUE: LeagueTeam[] = [
-  { name: "My Team", played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0 },
-  ...OPPONENTS.map(name => ({ name, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0 }))
 ];
