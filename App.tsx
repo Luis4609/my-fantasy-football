@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import { INITIAL_ROSTER } from './constants';
 import { Player, MatchRecord, Position, PlayerPerformance, TeamConfig } from './types';
 import { PlayerCard } from './components/PlayerCard';
@@ -7,6 +8,7 @@ import { MatchInput } from './components/MatchInput';
 import { MatchHistoryList } from './components/MatchHistoryList';
 import { MatchDetail } from './components/MatchDetail';
 import { TeamSettings } from './components/TeamSettings';
+import { AddPlayerModal } from './components/AddPlayerModal';
 import { LayoutDashboard, Users, Trophy, Menu, X, Shirt, PlusCircle, History, Search, TrendingUp, Target, Activity, Footprints, Settings } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -40,6 +42,8 @@ const App = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchRecord | null>(null);
+  const [customPlayers, setCustomPlayers] = useState<Player[]>([]);
+  const [isAddPlayerModalOpen, setIsAddPlayerModalOpen] = useState(false);
 
   // Roster Filter State
   const [rosterSearch, setRosterSearch] = useState('');
@@ -48,7 +52,7 @@ const App = () => {
   // 1. Calculate Base Roster from Match History (Pure Calculation)
   const baseRoster = React.useMemo(() => {
     // Start with clean initial roster AND RESET ARRAYS
-    const calculatedRoster = INITIAL_ROSTER.map(p => ({ ...p, form: [] as number[] }));
+    const calculatedRoster = [...INITIAL_ROSTER, ...customPlayers].map(p => ({ ...p, form: [] as number[] }));
 
     matchHistory.forEach(match => {
       match.performances.forEach(perf => {
@@ -100,7 +104,7 @@ const App = () => {
     });
 
     return calculatedRoster;
-  }, [matchHistory]);
+  }, [matchHistory, customPlayers]);
 
   // 2. Apply Manual Edits to create Final Roster
   const roster = React.useMemo(() => {
@@ -205,6 +209,10 @@ const App = () => {
     });
   };
 
+  const handleAddPlayer = (newPlayer: Player) => {
+    setCustomPlayers(prev => [...prev, newPlayer]);
+  };
+
   const TopPlayersChart = () => {
     const data = [...roster]
       .sort((a, b) => b.totalPoints - a.totalPoints)
@@ -212,8 +220,8 @@ const App = () => {
       .map(p => ({ name: p.name, points: p.totalPoints }));
 
     return (
-      <div className="h-64 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-64 w-full" style={{ height: 250, width: '100%' }}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart data={data} layout="vertical" margin={{ left: 20 }}>
             <XAxis type="number" hide />
             <YAxis dataKey="name" type="category" width={80} tick={{ fill: '#94a3b8', fontSize: 12 }} />
@@ -234,8 +242,8 @@ const App = () => {
 
   const TeamBalanceRadar = () => {
     return (
-      <div className="h-64 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-64 w-full" style={{ height: 250, width: '100%' }}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <RadarChart cx="50%" cy="50%" outerRadius="80%" data={teamBalanceData}>
             <PolarGrid stroke="#334155" />
             <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 12 }} />
@@ -492,6 +500,13 @@ const App = () => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => setIsAddPlayerModalOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20"
+                  >
+                    <PlusCircle size={18} />
+                    <span className="hidden sm:inline">Add Player</span>
+                  </button>
                   {/* Search */}
                   <div className="relative group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={16} />
@@ -590,6 +605,12 @@ const App = () => {
             <TeamSettings config={teamConfig} onSave={setTeamConfig} />
           )}
         </div>
+
+        <AddPlayerModal
+          isOpen={isAddPlayerModalOpen}
+          onClose={() => setIsAddPlayerModalOpen(false)}
+          onSave={handleAddPlayer}
+        />
       </main>
     </div>
   );
