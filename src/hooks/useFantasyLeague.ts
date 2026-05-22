@@ -117,7 +117,7 @@ export const useFantasyLeague = () => {
     };
 
     checkMigrationAndLoad();
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, apiFetch]);
 
   // --- Calculations ---
   
@@ -170,7 +170,7 @@ export const useFantasyLeague = () => {
     });
 
     return calculatedRoster;
-  }, [matchHistory, customPlayers, activeLeagueId]);
+  }, [matchHistory, customPlayers, activeLeagueId, teamConfig.hasCustomRoster]);
 
   // 2. Apply Manual Edits
   const roster = useMemo(() => {

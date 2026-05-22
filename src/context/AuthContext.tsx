@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export interface User {
@@ -18,7 +19,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
