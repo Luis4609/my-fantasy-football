@@ -108,8 +108,8 @@ function validateLeagues(leagues: any): string | null {
   if (leagues.length === 0) {
     return 'At least one league is required';
   }
-  for (let i = 0; i < leagues.length; i++) {
-    const league = leagues[i];
+  let i = 0;
+  for (const league of leagues) {
     if (!league.id || typeof league.id !== 'string') {
       return `League at index ${i} is missing a valid ID`;
     }
@@ -135,8 +135,8 @@ function validateLeagues(leagues: any): string | null {
     }
 
     const teamNamesSeen = new Set<string>();
-    for (let j = 0; j < league.teams.length; j++) {
-      const team = league.teams[j];
+    let j = 0;
+    for (const team of league.teams) {
       if (!team.id || typeof team.id !== 'string') {
         return `Team at index ${j} in league "${league.name}" is missing a valid ID`;
       }
@@ -155,7 +155,9 @@ function validateLeagues(leagues: any): string | null {
         return `Rival team "${team.name}" is duplicated in league "${league.name}"`;
       }
       teamNamesSeen.add(normName);
+      j++;
     }
+    i++;
   }
   return null;
 }
@@ -184,8 +186,8 @@ function validateMatches(matches: any): string | null {
     return 'Matches must be an array';
   }
 
-  for (let i = 0; i < matches.length; i++) {
-    const match = matches[i];
+  let i = 0;
+  for (const match of matches) {
     if (!match.opponent || typeof match.opponent !== 'string' || match.opponent.trim() === '') {
       return `Match at index ${i} is missing a valid opponent name`;
     }
@@ -216,8 +218,8 @@ function validateMatches(matches: any): string | null {
     let totalPlayerAssists = 0;
     let motmCount = 0;
 
-    for (let j = 0; j < match.performances.length; j++) {
-      const perf = match.performances[j];
+    let j = 0;
+    for (const perf of match.performances) {
       if (!perf.playerId || typeof perf.playerId !== 'string') {
         return `Performance at index ${j} in match against ${match.opponent} is missing a valid playerId`;
       }
@@ -248,6 +250,7 @@ function validateMatches(matches: any): string | null {
       if (perf.manOfTheMatch) {
         motmCount++;
       }
+      j++;
     }
 
     if (totalPlayerGoals > match.myScore) {
@@ -259,6 +262,7 @@ function validateMatches(matches: any): string | null {
     if (motmCount > 1) {
       return `Match against ${match.opponent} has more than one Man of the Match selected`;
     }
+    i++;
   }
 
   return null;
@@ -290,8 +294,8 @@ function validateCustomPlayers(players: any): string | null {
     return 'Players must be an array';
   }
   const validPositions = ['GK', 'DEF', 'MID', 'FWD', 'COACH'];
-  for (let i = 0; i < players.length; i++) {
-    const p = players[i];
+  let i = 0;
+  for (const p of players) {
     if (!p.id || typeof p.id !== 'string') {
       return `Player at index ${i} is missing a valid ID`;
     }
@@ -320,6 +324,7 @@ function validateCustomPlayers(players: any): string | null {
     if (typeof p.assists !== 'number' || !Number.isInteger(p.assists) || p.assists < 0) {
       return `Player "${p.name}" has invalid assists count`;
     }
+    i++;
   }
   return null;
 }
@@ -349,40 +354,41 @@ function validatePlayerEdits(edits: any): string | null {
     return 'Player edits must be an object';
   }
   const validPositions = ['GK', 'DEF', 'MID', 'FWD', 'COACH'];
-  for (const playerId in edits) {
-    if (Object.prototype.hasOwnProperty.call(edits, playerId)) {
-      const edit = edits[playerId];
-      if (!edit || typeof edit !== 'object') {
-        return `Edit entry for player ID ${playerId} is invalid`;
+  for (const [playerId, editVal] of Object.entries(edits)) {
+    const edit = editVal as any;
+    if (!edit || typeof edit !== 'object') {
+      return `Edit entry for player ID ${playerId} is invalid`;
+    }
+    if (edit.name !== undefined) {
+      if (typeof edit.name !== 'string' || edit.name.trim() === '') {
+        return `Edited name for player ID ${playerId} cannot be empty`;
       }
-      if (edit.name !== undefined) {
-        if (typeof edit.name !== 'string' || edit.name.trim() === '') {
-          return `Edited name for player ID ${playerId} cannot be empty`;
-        }
-        edit.name = sanitizeString(edit.name);
-        if (edit.name === '') {
-          return `Edited name for player ID ${playerId} must contain valid characters`;
-        }
-        if (edit.name.length > 50) {
-          return `Edited name for player ID ${playerId} must be 50 characters or less`;
-        }
+      edit.name = sanitizeString(edit.name);
+      if (edit.name === '') {
+        return `Edited name for player ID ${playerId} must contain valid characters`;
       }
-      if (edit.number !== undefined) {
-        if (typeof edit.number !== 'number' || !Number.isInteger(edit.number) || edit.number < 1 || edit.number > 99) {
-          return `Edited shirt number for player ID ${playerId} must be an integer between 1 and 99`;
-        }
+      if (edit.name.length > 50) {
+        return `Edited name for player ID ${playerId} must be 50 characters or less`;
       }
-      if (edit.position !== undefined) {
-        if (typeof edit.position !== 'string' || !validPositions.includes(edit.position)) {
-          return `Edited position for player ID ${playerId} is invalid`;
-        }
+    }
+    if (edit.number !== undefined) {
+      if (typeof edit.number !== 'number' || !Number.isInteger(edit.number) || edit.number < 1 || edit.number > 99) {
+        return `Edited shirt number for player ID ${playerId} must be an integer between 1 and 99`;
       }
-      const offsetFields = ['matchesOffset', 'goalsOffset', 'assistsOffset', 'cleanSheetsOffset', 'pointsOffset'];
-      for (const field of offsetFields) {
-        if (edit[field] !== undefined) {
-          if (typeof edit[field] !== 'number' || !Number.isInteger(edit[field])) {
-            return `Offset field ${field} for player ID ${playerId} must be an integer`;
-          }
+    }
+    if (edit.position !== undefined) {
+      if (typeof edit.position !== 'string' || !validPositions.includes(edit.position)) {
+        return `Edited position for player ID ${playerId} is invalid`;
+      }
+    }
+    
+    // Safely destructure only the allowed offset fields to avoid bracket notation/dynamic lookup
+    const { matchesOffset, goalsOffset, assistsOffset, cleanSheetsOffset, pointsOffset } = edit;
+    const offsets = { matchesOffset, goalsOffset, assistsOffset, cleanSheetsOffset, pointsOffset };
+    for (const [field, val] of Object.entries(offsets)) {
+      if (val !== undefined) {
+        if (typeof val !== 'number' || !Number.isInteger(val)) {
+          return `Offset field ${field} for player ID ${playerId} must be an integer`;
         }
       }
     }
