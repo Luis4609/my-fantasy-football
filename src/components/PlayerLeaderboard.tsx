@@ -1,13 +1,33 @@
 
 import React, { useState } from 'react';
 import { Player, Position } from '../types';
-import { ArrowUpDown, Trophy, Medal } from 'lucide-react';
+import { ArrowUpDown, Medal } from 'lucide-react';
 
 interface PlayerLeaderboardProps {
   roster: Player[];
 }
 
 type SortField = 'totalPoints' | 'averageRating' | 'goals' | 'assists' | 'matchesPlayed';
+
+interface SortHeaderProps {
+  field: SortField;
+  label: string;
+  right?: boolean;
+  sortField: SortField;
+  onSort: (field: SortField) => void;
+}
+
+const SortHeader = ({ field, label, right = false, sortField, onSort }: SortHeaderProps) => (
+  <th 
+    className={`px-4 py-3 cursor-pointer hover:bg-slate-800 transition-colors select-none ${right ? 'text-right' : 'text-left'}`}
+    onClick={() => onSort(field)}
+  >
+    <div className={`flex items-center gap-1 ${right ? 'justify-end' : ''}`}>
+      {label}
+      <ArrowUpDown size={12} className={`opacity-40 ${sortField === field ? 'opacity-100 text-indigo-400' : ''}`} />
+    </div>
+  </th>
+);
 
 export const PlayerLeaderboard: React.FC<PlayerLeaderboardProps> = ({ roster }) => {
   const [sortField, setSortField] = useState<SortField>('totalPoints');
@@ -30,18 +50,6 @@ export const PlayerLeaderboard: React.FC<PlayerLeaderboardProps> = ({ roster }) 
       return sortDesc ? valB - valA : valA - valB;
     });
 
-  const SortHeader = ({ field, label, right = false }: { field: SortField, label: string, right?: boolean }) => (
-    <th 
-      className={`px-4 py-3 cursor-pointer hover:bg-slate-800 transition-colors select-none ${right ? 'text-right' : 'text-left'}`}
-      onClick={() => handleSort(field)}
-    >
-      <div className={`flex items-center gap-1 ${right ? 'justify-end' : ''}`}>
-        {label}
-        <ArrowUpDown size={12} className={`opacity-40 ${sortField === field ? 'opacity-100 text-indigo-400' : ''}`} />
-      </div>
-    </th>
-  );
-
   return (
     <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
       <table className="w-full text-sm">
@@ -49,11 +57,11 @@ export const PlayerLeaderboard: React.FC<PlayerLeaderboardProps> = ({ roster }) 
           <tr>
             <th className="px-4 py-3 text-left w-12">#</th>
             <th className="px-4 py-3 text-left">Player</th>
-            <SortHeader field="matchesPlayed" label="Apps" right />
-            <SortHeader field="goals" label="G" right />
-            <SortHeader field="assists" label="A" right />
-            <SortHeader field="averageRating" label="Avg Rtg" right />
-            <SortHeader field="totalPoints" label="Points" right />
+            <SortHeader field="matchesPlayed" label="Apps" right sortField={sortField} onSort={handleSort} />
+            <SortHeader field="goals" label="G" right sortField={sortField} onSort={handleSort} />
+            <SortHeader field="assists" label="A" right sortField={sortField} onSort={handleSort} />
+            <SortHeader field="averageRating" label="Avg Rtg" right sortField={sortField} onSort={handleSort} />
+            <SortHeader field="totalPoints" label="Points" right sortField={sortField} onSort={handleSort} />
             <th className="px-4 py-3 text-center">Form</th>
           </tr>
         </thead>

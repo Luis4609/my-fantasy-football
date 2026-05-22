@@ -1,23 +1,31 @@
 import React, { useState } from 'react';
 import { PlusCircle, Search } from 'lucide-react';
-import { Player, Position, TeamConfig } from '../../types';
+import { Player, Position, TeamConfig, MatchRecord } from '../types';
 import { PlayerCard } from './../components/PlayerCard';
+import { PlayerDetailModal } from './../components/PlayerDetailModal';
 
 interface RosterViewProps {
     roster: Player[];
     teamConfig: TeamConfig;
     setIsAddPlayerModalOpen: (isOpen: boolean) => void;
     handleUpdatePlayer: (id: string, updatedData: Partial<Player>) => void;
+    linkedPlayerId: string | null;
+    onLinkPlayerCard: (id: string | null) => void;
+    matchHistory: MatchRecord[];
 }
 
 export const RosterView: React.FC<RosterViewProps> = ({
     roster,
     teamConfig,
     setIsAddPlayerModalOpen,
-    handleUpdatePlayer
+    handleUpdatePlayer,
+    linkedPlayerId,
+    onLinkPlayerCard,
+    matchHistory
 }) => {
     const [rosterSearch, setRosterSearch] = useState('');
     const [rosterFilter, setRosterFilter] = useState<'ALL' | Position>('ALL');
+    const [selectedPlayerForDetail, setSelectedPlayerForDetail] = useState<Player | null>(null);
 
     return (
         <div>
@@ -80,7 +88,15 @@ export const RosterView: React.FC<RosterViewProps> = ({
                         return matchesSearch && matchesFilter;
                     })
                     .map(player => (
-                        <PlayerCard key={player.id} player={player} onUpdate={handleUpdatePlayer} />
+                        <PlayerCard
+                            key={player.id}
+                            player={player}
+                            onUpdate={handleUpdatePlayer}
+                            isLinked={linkedPlayerId === player.id}
+                            onLink={() => onLinkPlayerCard(linkedPlayerId === player.id ? null : player.id)}
+                            onSelect={() => setSelectedPlayerForDetail(player)}
+                            roster={roster}
+                        />
                     ))}
             </div>
 
@@ -100,6 +116,19 @@ export const RosterView: React.FC<RosterViewProps> = ({
                         </button>
                     </div>
                 )}
+
+            {/* Detailed Player Profile Modal */}
+            {selectedPlayerForDetail && (
+                <PlayerDetailModal
+                    player={selectedPlayerForDetail}
+                    matchHistory={matchHistory}
+                    isOpen={!!selectedPlayerForDetail}
+                    onClose={() => setSelectedPlayerForDetail(null)}
+                    teamConfig={teamConfig}
+                    isLinked={linkedPlayerId === selectedPlayerForDetail.id}
+                    onLink={() => onLinkPlayerCard(linkedPlayerId === selectedPlayerForDetail.id ? null : selectedPlayerForDetail.id)}
+                />
+            )}
         </div>
     );
 };

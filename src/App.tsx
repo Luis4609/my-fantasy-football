@@ -11,8 +11,12 @@ import { useFantasyLeague } from './hooks/useFantasyLeague';
 import { MatchRecord } from './types';
 import { DashboardView } from './views/DashboardView';
 import { RosterView } from './views/RosterView';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { LoginView } from './views/LoginView';
+import { Loader2 } from 'lucide-react';
 
-const App = () => {
+const AppContent = () => {
+  const { isAuthenticated, isLoading } = useAuth();
   const {
     teamConfig,
     setTeamConfig,
@@ -22,13 +26,41 @@ const App = () => {
     teamBalanceData,
     addMatch,
     updatePlayer,
-    addPlayer
+    addPlayer,
+    importTeam,
+    leagues,
+    activeLeagueId,
+    setActiveLeagueId,
+    createLeague,
+    updateLeague,
+    deleteLeague,
+    linkedPlayerId,
+    linkPlayerCard
   } = useFantasyLeague();
 
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchRecord | null>(null);
   const [isAddPlayerModalOpen, setIsAddPlayerModalOpen] = useState(false);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-indigo-500">
+        <Loader2 className="w-12 h-12 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginView onLoginSuccess={() => setCurrentView('dashboard')} />;
+  }
+
+  const activeLeague = leagues.find(l => l.id === activeLeagueId);
+
+  // Filter match history for the active league
+  const activeMatchHistory = matchHistory.filter(m =>
+    m.leagueId === activeLeagueId || (!m.leagueId && activeLeagueId === 'default-2024')
+  );
 
   const handleSaveMatch = (match: MatchRecord) => {
     addMatch(match);
@@ -62,10 +94,11 @@ const App = () => {
               teamConfig={teamConfig}
               leagueStats={leagueStats}
               roster={roster}
-              matchHistory={matchHistory}
+              matchHistory={activeMatchHistory}
               teamBalanceData={teamBalanceData}
               setCurrentView={setCurrentView}
               setSelectedMatch={setSelectedMatch}
+              activeLeagueName={activeLeague?.name || 'Season 2024'}
             />
           )}
 
@@ -75,8 +108,12 @@ const App = () => {
               teamConfig={teamConfig}
               setIsAddPlayerModalOpen={setIsAddPlayerModalOpen}
               handleUpdatePlayer={updatePlayer}
+              linkedPlayerId={linkedPlayerId}
+              onLinkPlayerCard={linkPlayerCard}
+              matchHistory={activeMatchHistory}
             />
           )}
+
 
           {currentView === 'leaderboard' && (
             <div>
@@ -90,6 +127,8 @@ const App = () => {
               <MatchInput
                 roster={roster}
                 teamName={teamConfig.name}
+                rivalTeams={activeLeague?.teams || []}
+                leagueId={activeLeagueId}
                 onSave={handleSaveMatch}
                 onCancel={() => setCurrentView('dashboard')}
               />
@@ -100,12 +139,22 @@ const App = () => {
             selectedMatch ? (
               <MatchDetail match={selectedMatch} roster={roster} teamName={teamConfig.name} onBack={() => setSelectedMatch(null)} />
             ) : (
-              <MatchHistoryList matches={matchHistory} teamName={teamConfig.name} onSelectMatch={setSelectedMatch} />
+              <MatchHistoryList matches={activeMatchHistory} teamName={teamConfig.name} onSelectMatch={setSelectedMatch} />
             )
           )}
 
           {currentView === 'settings' && (
-            <TeamSettings config={teamConfig} onSave={setTeamConfig} />
+            <TeamSettings
+              config={teamConfig}
+              onSave={setTeamConfig}
+              importTeam={importTeam}
+              leagues={leagues}
+              activeLeagueId={activeLeagueId}
+              setActiveLeagueId={setActiveLeagueId}
+              createLeague={createLeague}
+              updateLeague={updateLeague}
+              deleteLeague={deleteLeague}
+            />
           )}
         </div>
 
@@ -113,10 +162,19 @@ const App = () => {
           isOpen={isAddPlayerModalOpen}
           onClose={() => setIsAddPlayerModalOpen(false)}
           onSave={addPlayer}
+          roster={roster}
         />
       </main>
     </div>
   );
 };
 
-export default App;
+const App = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+};
+
+export default App;

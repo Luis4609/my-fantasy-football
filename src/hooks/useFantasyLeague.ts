@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { INITIAL_ROSTER } from './../constants';
-import { Player, MatchRecord, Position, TeamConfig, PlayerPerformance } from './../types';
+import { useState, useEffect, useMemo } from 'react';
+import { INITIAL_ROSTER, OPPONENTS } from '@/constants';
+import { Player, MatchRecord, Position, TeamConfig, League, RivalTeam } from '@/types';
+import { useAuth } from '@/context/AuthContext';
+import * as api from '@/services/api';
 
 // Helper interface for edit state
 export interface PlayerEditState {
@@ -16,55 +18,118 @@ export interface PlayerEditState {
 }
 
 export const useFantasyLeague = () => {
+  const { isAuthenticated, apiFetch, user } = useAuth();
+
   // --- State ---
-  const [teamConfig, setTeamConfig] = useState<TeamConfig>(() => {
-    const saved = localStorage.getItem('fantasy_teamConfig');
-    return saved ? JSON.parse(saved) : {
-      name: 'My Team',
-      primaryColor: '#4f46e5', // Indigo 600
-      secondaryColor: '#10b981' // Emerald 500
+  const [teamConfig, setTeamConfig] = useState<TeamConfig>({
+    name: 'My Team',
+    primaryColor: '#4f46e5', // Indigo 600
+    secondaryColor: '#10b981' // Emerald 500
+  });
+  const [linkedPlayerId, setLinkedPlayerId] = useState<string | null>(null);
+
+  const [leagues, setLeagues] = useState<League[]>(() => {
+    // Default initial league
+    return [{
+      id: 'default-2024',
+      name: 'Season 2024',
+      year: '2024',
+      teams: OPPONENTS.map((name, i) => ({ id: `rival-${i}`, name })),
+      isActive: true
+    }];
+  });
+
+  const [activeLeagueId, setActiveLeagueId] = useState<string>(() => {
+    const saved = localStorage.getItem('fantasy_activeLeagueId');
+    return saved || 'default-2024';
+  });
+
+  const [matchHistory, setMatchHistory] = useState<MatchRecord[]>([]);
+  const [playerEdits, setPlayerEdits] = useState<Record<string, PlayerEditState>>({});
+  const [customPlayers, setCustomPlayers] = useState<Player[]>([]);
+
+  // Keep active league ID persistent in localstorage (UI preferences)
+  useEffect(() => {
+    localStorage.setItem('fantasy_activeLeagueId', activeLeagueId);
+  }, [activeLeagueId]);
+
+  // --- Load and Migrate Data ---
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const loadData = async () => {
+      try {
+        const data = await api.getAllData(apiFetch);
+        setTeamConfig(data.teamConfig);
+        if (data.leagues && data.leagues.length > 0) {
+          setLeagues(data.leagues);
+        }
+        setMatchHistory(data.matches || []);
+        setCustomPlayers(data.customPlayers || []);
+        setPlayerEdits(data.playerEdits || {});
+        setLinkedPlayerId(data.linkedPlayerId || null);
+
+        // Set active league
+        if (data.leagues && data.leagues.length > 0) {
+          const defaultActive = data.leagues[0].id;
+          setActiveLeagueId(prev => data.leagues.some((l: any) => l.id === prev) ? prev : defaultActive);
+        }
+      } catch (err) {
+        console.error('Error fetching data from server:', err);
+      }
     };
-  });
 
-  const [matchHistory, setMatchHistory] = useState<MatchRecord[]>(() => {
-    const saved = localStorage.getItem('fantasy_matchHistory');
-    return saved ? JSON.parse(saved) : [];
-  });
+    const checkMigrationAndLoad = async () => {
+      if (!user) return;
+      const migrationKey = `fantasy_migrated_${user.id}`;
+      const alreadyMigrated = localStorage.getItem(migrationKey);
 
-  const [playerEdits, setPlayerEdits] = useState<Record<string, PlayerEditState>>(() => {
-    const saved = localStorage.getItem('fantasy_playerEdits');
-    return saved ? JSON.parse(saved) : {};
-  });
+      if (!alreadyMigrated) {
+        // Retrieve local storage values if they exist
+        const localTeamConfig = localStorage.getItem('fantasy_teamConfig');
+        const localLeagues = localStorage.getItem('fantasy_leagues');
+        const localMatchHistory = localStorage.getItem('fantasy_matchHistory');
+        const localCustomPlayers = localStorage.getItem('fantasy_customPlayers');
+        const localPlayerEdits = localStorage.getItem('fantasy_playerEdits');
 
-  const [customPlayers, setCustomPlayers] = useState<Player[]>(() => {
-    const saved = localStorage.getItem('fantasy_customPlayers');
-    return saved ? JSON.parse(saved) : [];
-  });
+        // Check if there is anything to migrate
+        if (localTeamConfig || localLeagues || localMatchHistory || localCustomPlayers || localPlayerEdits) {
+          console.log('Migrating offline data to server for user:', user.email);
+          try {
+            await api.syncAllData(apiFetch, {
+              teamConfig: localTeamConfig ? JSON.parse(localTeamConfig) : undefined,
+              leagues: localLeagues ? JSON.parse(localLeagues) : undefined,
+              matches: localMatchHistory ? JSON.parse(localMatchHistory) : undefined,
+              customPlayers: localCustomPlayers ? JSON.parse(localCustomPlayers) : undefined,
+              playerEdits: localPlayerEdits ? JSON.parse(localPlayerEdits) : undefined
+            });
+            localStorage.setItem(migrationKey, 'true');
+            console.log('Migration complete');
+          } catch (err) {
+            console.error('Migration failed:', err);
+          }
+        } else {
+          localStorage.setItem(migrationKey, 'true');
+        }
+      }
 
-  // --- Persistence Effects ---
-  useEffect(() => {
-    localStorage.setItem('fantasy_teamConfig', JSON.stringify(teamConfig));
-  }, [teamConfig]);
+      await loadData();
+    };
 
-  useEffect(() => {
-    localStorage.setItem('fantasy_matchHistory', JSON.stringify(matchHistory));
-  }, [matchHistory]);
-
-  useEffect(() => {
-    localStorage.setItem('fantasy_playerEdits', JSON.stringify(playerEdits));
-  }, [playerEdits]);
-
-  useEffect(() => {
-    localStorage.setItem('fantasy_customPlayers', JSON.stringify(customPlayers));
-  }, [customPlayers]);
+    checkMigrationAndLoad();
+  }, [isAuthenticated, user]);
 
   // --- Calculations ---
   
   // 1. Calculate Base Roster from Match History
   const baseRoster = useMemo(() => {
-    const calculatedRoster = [...INITIAL_ROSTER, ...customPlayers].map(p => ({ ...p, form: [] as number[] }));
+    const playersToMap = teamConfig.hasCustomRoster ? customPlayers : [...INITIAL_ROSTER, ...customPlayers];
+    const calculatedRoster = playersToMap.map(p => ({ ...p, form: [] as number[] }));
+    
+    // Filter matches by active league
+    const activeMatches = matchHistory.filter(m => m.leagueId === activeLeagueId || (!m.leagueId && activeLeagueId === 'default-2024'));
 
-    matchHistory.forEach(match => {
+    activeMatches.forEach(match => {
       match.performances.forEach(perf => {
         const player = calculatedRoster.find(p => p.id === perf.playerId);
         if (player) {
@@ -105,7 +170,7 @@ export const useFantasyLeague = () => {
     });
 
     return calculatedRoster;
-  }, [matchHistory, customPlayers]);
+  }, [matchHistory, customPlayers, activeLeagueId]);
 
   // 2. Apply Manual Edits
   const roster = useMemo(() => {
@@ -130,7 +195,8 @@ export const useFantasyLeague = () => {
   const leagueStats = useMemo(() => {
     let played = 0, won = 0, drawn = 0, lost = 0, gf = 0, ga = 0, points = 0;
     const form: string[] = [];
-    const sortedMatches = [...matchHistory].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const activeMatches = matchHistory.filter(m => m.leagueId === activeLeagueId || (!m.leagueId && activeLeagueId === 'default-2024'));
+    const sortedMatches = [...activeMatches].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     sortedMatches.forEach(m => {
       played++;
@@ -153,7 +219,7 @@ export const useFantasyLeague = () => {
     });
 
     return { played, won, drawn, lost, gf, ga, points, form: form.slice(-5) };
-  }, [matchHistory]);
+  }, [matchHistory, activeLeagueId]);
 
   const teamBalanceData = useMemo(() => {
     const data = {
@@ -178,45 +244,167 @@ export const useFantasyLeague = () => {
   }, [roster]);
 
   // --- Actions ---
+  
+  const saveTeamConfig = (config: TeamConfig) => {
+    setTeamConfig(config);
+    if (isAuthenticated) {
+      api.saveTeamConfig(apiFetch, config).catch(err => console.error("Error saving team config:", err));
+    }
+  };
+
   const addMatch = (match: MatchRecord) => {
-    setMatchHistory(prev => [...prev, match]);
+    const matchWithLeague = { ...match, leagueId: activeLeagueId };
+    const updatedHistory = [...matchHistory, matchWithLeague];
+    setMatchHistory(updatedHistory);
+
+    if (isAuthenticated) {
+      api.saveMatches(apiFetch, updatedHistory).catch(err => console.error("Error saving match history:", err));
+    }
+  };
+
+  const createLeague = (name: string, year: string, teams: RivalTeam[]) => {
+    const newLeague: League = {
+      id: `league-${Date.now()}`,
+      name,
+      year,
+      teams,
+      isActive: true
+    };
+    const updatedLeagues = [...leagues, newLeague];
+    setLeagues(updatedLeagues);
+    setActiveLeagueId(newLeague.id);
+
+    if (isAuthenticated) {
+      api.saveLeagues(apiFetch, updatedLeagues).catch(err => console.error("Error saving leagues:", err));
+    }
+  };
+
+  const updateLeague = (id: string, updates: Partial<League>) => {
+    const updatedLeagues = leagues.map(l => l.id === id ? { ...l, ...updates } : l);
+    setLeagues(updatedLeagues);
+
+    if (isAuthenticated) {
+      api.saveLeagues(apiFetch, updatedLeagues).catch(err => console.error("Error saving leagues:", err));
+    }
+  };
+
+  const deleteLeague = (id: string) => {
+    if (leagues.length <= 1) return; // Prevent deleting last league
+    const updatedLeagues = leagues.filter(l => l.id !== id);
+    setLeagues(updatedLeagues);
+
+    let newActiveId = activeLeagueId;
+    if (activeLeagueId === id) {
+      newActiveId = leagues.find(l => l.id !== id)?.id || '';
+      setActiveLeagueId(newActiveId);
+    }
+
+    if (isAuthenticated) {
+      api.saveLeagues(apiFetch, updatedLeagues).catch(err => console.error("Error deleting league:", err));
+    }
   };
 
   const updatePlayer = (id: string, updatedData: Partial<Player>) => {
-    setPlayerEdits(prev => {
-      const basePlayer = baseRoster.find(p => p.id === id);
-      if (!basePlayer) return prev;
+    const basePlayer = baseRoster.find(p => p.id === id);
+    if (!basePlayer) return;
 
-      const currentEdit = prev[id] || {};
-      const newEdit: PlayerEditState = { ...currentEdit };
+    const currentEdit = playerEdits[id] || {};
+    const newEdit: PlayerEditState = { ...currentEdit };
 
-      if (updatedData.name !== undefined) newEdit.name = updatedData.name;
-      if (updatedData.number !== undefined) newEdit.number = updatedData.number;
-      if (updatedData.position !== undefined) newEdit.position = updatedData.position;
+    if (updatedData.name !== undefined) newEdit.name = updatedData.name;
+    if (updatedData.number !== undefined) newEdit.number = updatedData.number;
+    if (updatedData.position !== undefined) newEdit.position = updatedData.position;
 
-      if (updatedData.matchesPlayed !== undefined) newEdit.matchesOffset = updatedData.matchesPlayed - basePlayer.matchesPlayed;
-      if (updatedData.goals !== undefined) newEdit.goalsOffset = updatedData.goals - basePlayer.goals;
-      if (updatedData.assists !== undefined) newEdit.assistsOffset = updatedData.assists - basePlayer.assists;
-      if (updatedData.cleanSheets !== undefined) newEdit.cleanSheetsOffset = updatedData.cleanSheets - basePlayer.cleanSheets;
-      if (updatedData.totalPoints !== undefined) newEdit.pointsOffset = updatedData.totalPoints - basePlayer.totalPoints;
+    if (updatedData.matchesPlayed !== undefined) newEdit.matchesOffset = updatedData.matchesPlayed - basePlayer.matchesPlayed;
+    if (updatedData.goals !== undefined) newEdit.goalsOffset = updatedData.goals - basePlayer.goals;
+    if (updatedData.assists !== undefined) newEdit.assistsOffset = updatedData.assists - basePlayer.assists;
+    if (updatedData.cleanSheets !== undefined) newEdit.cleanSheetsOffset = updatedData.cleanSheets - basePlayer.cleanSheets;
+    if (updatedData.totalPoints !== undefined) newEdit.pointsOffset = updatedData.totalPoints - basePlayer.totalPoints;
 
-      return { ...prev, [id]: newEdit };
-    });
+    const updatedEdits = { ...playerEdits, [id]: newEdit };
+    setPlayerEdits(updatedEdits);
+
+    if (isAuthenticated) {
+      api.savePlayerEdits(apiFetch, updatedEdits).catch(err => console.error("Error saving player edits:", err));
+    }
   };
 
   const addPlayer = (newPlayer: Player) => {
-    setCustomPlayers(prev => [...prev, newPlayer]);
+    const updatedCustomPlayers = [...customPlayers, newPlayer];
+    setCustomPlayers(updatedCustomPlayers);
+
+    if (isAuthenticated) {
+      api.saveCustomPlayers(apiFetch, updatedCustomPlayers).catch(err => console.error("Error saving custom players:", err));
+    }
+  };
+
+  const importTeam = async (teamName: string, players: Player[]) => {
+    const newConfig = {
+      ...teamConfig,
+      name: teamName,
+      hasCustomRoster: true
+    };
+    
+    const defaultLeague = [{
+      id: 'default-2024',
+      name: 'Season 2024',
+      year: '2024',
+      teams: OPPONENTS.map((name, i) => ({ id: `rival-${i}`, name })),
+      isActive: true
+    }];
+
+    setTeamConfig(newConfig);
+    setCustomPlayers(players);
+    setPlayerEdits({});
+    setMatchHistory([]);
+    setLeagues(defaultLeague);
+    setActiveLeagueId('default-2024');
+
+    if (isAuthenticated) {
+      try {
+        await api.syncAllData(apiFetch, {
+          teamConfig: newConfig,
+          customPlayers: players,
+          playerEdits: {},
+          matches: [],
+          leagues: defaultLeague
+        });
+      } catch (err) {
+        console.error("Error syncing imported team:", err);
+      }
+    }
+  };
+
+  const linkPlayerCard = async (playerId: string | null) => {
+    if (isAuthenticated) {
+      try {
+        await api.linkPlayerCard(apiFetch, playerId);
+        setLinkedPlayerId(playerId);
+      } catch (err) {
+        console.error("Error linking player card:", err);
+      }
+    }
   };
 
   return {
     teamConfig,
-    setTeamConfig,
+    setTeamConfig: saveTeamConfig,
     matchHistory,
     roster,
     leagueStats,
     teamBalanceData,
     addMatch,
     updatePlayer,
-    addPlayer
+    addPlayer,
+    importTeam,
+    leagues,
+    activeLeagueId,
+    setActiveLeagueId,
+    createLeague,
+    updateLeague,
+    deleteLeague,
+    linkedPlayerId,
+    linkPlayerCard
   };
 };
+

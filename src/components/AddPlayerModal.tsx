@@ -1,14 +1,23 @@
 import React, { useState } from 'react';
 import { Position, Player } from '../types';
-import { X, Save, UserPlus } from 'lucide-react';
+import { X, Save, UserPlus, AlertCircle } from 'lucide-react';
 
 interface AddPlayerModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (player: Player) => void;
+    roster: Player[];
 }
 
-export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({ isOpen, onClose, onSave }) => {
+const getFirstAvailableNumber = (roster: Player[]): number => {
+    const existing = new Set(roster.map(p => p.number));
+    for (let i = 1; i <= 99; i++) {
+        if (!existing.has(i)) return i;
+    }
+    return 99;
+};
+
+export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({ isOpen, onClose, onSave, roster }) => {
     const [name, setName] = useState('');
     const [number, setNumber] = useState<number | ''>('');
     const [position, setPosition] = useState<Position>(Position.MID);
@@ -17,22 +26,71 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({ isOpen, onClose,
     const [matchesPlayed, setMatchesPlayed] = useState<number | ''>(0);
     const [goals, setGoals] = useState<number | ''>(0);
     const [assists, setAssists] = useState<number | ''>(0);
+    const [error, setError] = useState<string | null>(null);
 
     if (!isOpen) return null;
 
+    const handleClose = () => {
+        setError(null);
+        setName('');
+        setNumber('');
+        setPosition(Position.MID);
+        setMatchesPlayed(0);
+        setGoals(0);
+        setAssists(0);
+        onClose();
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
 
-        if (!name || !number) return;
+        if (!name || name.trim() === '') {
+            setError("Player name is required.");
+            return;
+        }
+        if (name.length > 50) {
+            setError("Player name must be 50 characters or less.");
+            return;
+        }
+        
+        let finalNumber: number;
+        if (number === '') {
+            finalNumber = getFirstAvailableNumber(roster);
+        } else {
+            const numVal = Number(number);
+            if (isNaN(numVal) || numVal < 1 || numVal > 99 || !Number.isInteger(numVal)) {
+                setError("Shirt number must be an integer between 1 and 99.");
+                return;
+            }
+            finalNumber = numVal;
+        }
+
+        const m = Number(matchesPlayed) || 0;
+        const g = Number(goals) || 0;
+        const a = Number(assists) || 0;
+
+        if (m < 0 || !Number.isInteger(m)) {
+            setError("Matches played cannot be negative.");
+            return;
+        }
+        if (g < 0 || !Number.isInteger(g)) {
+            setError("Goals cannot be negative.");
+            return;
+        }
+        if (a < 0 || !Number.isInteger(a)) {
+            setError("Assists cannot be negative.");
+            return;
+        }
 
         const newPlayer: Player = {
             id: `custom-${Date.now()}`,
             name,
-            number: Number(number),
+            number: finalNumber,
             position,
-            matchesPlayed: Number(matchesPlayed) || 0,
-            goals: Number(goals) || 0,
-            assists: Number(assists) || 0,
+            matchesPlayed: m,
+            goals: g,
+            assists: a,
             cleanSheets: 0,
             totalPoints: 0, // Will be calculated or edited later
             averageRating: 0,
@@ -40,15 +98,7 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({ isOpen, onClose,
         };
 
         onSave(newPlayer);
-        onClose();
-
-        // Reset form
-        setName('');
-        setNumber('');
-        setPosition(Position.MID);
-        setMatchesPlayed(0);
-        setGoals(0);
-        setAssists(0);
+        handleClose();
     };
 
     return (
@@ -59,12 +109,19 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({ isOpen, onClose,
                         <UserPlus className="text-emerald-400" size={24} />
                         Add New Player
                     </h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+                    <button onClick={handleClose} className="text-slate-400 hover:text-white transition-colors">
                         <X size={24} />
                     </button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    {error && (
+                        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2 animate-pulse">
+                            <AlertCircle size={14} className="shrink-0" />
+                            <div className="font-semibold">{error}</div>
+                        </div>
+                    )}
+
                     {/* Basic Info */}
                     <div className="space-y-4">
                         <div>
@@ -81,12 +138,11 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({ isOpen, onClose,
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Number</label>
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Number (Optional)</label>
                                 <input
                                     type="number"
-                                    required
                                     value={number}
-                                    onChange={(e) => setNumber(Number(e.target.value))}
+                                    onChange={(e) => setNumber(e.target.value !== '' ? Number(e.target.value) : '')}
                                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-emerald-500 outline-none"
                                     placeholder="#"
                                 />
@@ -114,7 +170,7 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({ isOpen, onClose,
                                 <input
                                     type="number"
                                     value={matchesPlayed}
-                                    onChange={(e) => setMatchesPlayed(Number(e.target.value))}
+                                    onChange={(e) => setMatchesPlayed(e.target.value !== '' ? Number(e.target.value) : '')}
                                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none"
                                 />
                             </div>
@@ -123,7 +179,7 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({ isOpen, onClose,
                                 <input
                                     type="number"
                                     value={goals}
-                                    onChange={(e) => setGoals(Number(e.target.value))}
+                                    onChange={(e) => setGoals(e.target.value !== '' ? Number(e.target.value) : '')}
                                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none"
                                 />
                             </div>
@@ -132,7 +188,7 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({ isOpen, onClose,
                                 <input
                                     type="number"
                                     value={assists}
-                                    onChange={(e) => setAssists(Number(e.target.value))}
+                                    onChange={(e) => setAssists(e.target.value !== '' ? Number(e.target.value) : '')}
                                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none"
                                 />
                             </div>
@@ -142,7 +198,7 @@ export const AddPlayerModal: React.FC<AddPlayerModalProps> = ({ isOpen, onClose,
                     <div className="pt-4 flex gap-3">
                         <button
                             type="button"
-                            onClick={onClose}
+                            onClick={handleClose}
                             className="flex-1 px-4 py-3 rounded-xl font-bold text-slate-400 hover:bg-slate-800 transition-colors"
                         >
                             Cancel

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Activity, TrendingUp, Users, Target, History, Footprints } from 'lucide-react';
-import { MatchRecord, Player, TeamConfig } from '../../types';
+import { Activity, TrendingUp, Users, Target, History, Footprints, Plus } from 'lucide-react';
+import { MatchRecord, Player, TeamConfig } from '../types';
 import { TopPlayersChart } from './../components/charts/TopPlayersChart';
 import { TeamBalanceRadar } from './../components/charts/TeamBalanceRadar';
 import { View } from './../components/layout/Sidebar';
@@ -22,6 +22,7 @@ interface DashboardViewProps {
     teamBalanceData: { subject: string; A: number; fullMark: number }[];
     setCurrentView: (view: View) => void;
     setSelectedMatch: (match: MatchRecord) => void;
+    activeLeagueName: string;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -31,15 +32,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     matchHistory,
     teamBalanceData,
     setCurrentView,
-    setSelectedMatch
+    setSelectedMatch,
+    activeLeagueName
 }) => {
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex justify-between items-end">
+            <div className="flex justify-between items-end mb-8 animate-in slide-in-from-top-4 duration-500">
                 <div>
-                    <h2 className="text-2xl font-bold text-white">Dashboard</h2>
-                    <p className="text-slate-400 text-sm mt-1">Season Overview & {teamConfig.name} Performance</p>
+                    <h2 className="text-4xl font-black text-white tracking-tight mb-2">
+                        Dashboard
+                        <span className="ml-3 text-lg font-medium text-slate-500 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
+                            {activeLeagueName}
+                        </span>
+                    </h2>
+                    <p className="text-slate-400">Overview of your team's performance and key metrics.</p>
                 </div>
+                <button
+                    onClick={() => setCurrentView('match_input')}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-900/20 flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+                >
+                    <Plus size={20} />
+                    Input Match
+                </button>
             </div>
 
             {/* Top Stats Cards */}

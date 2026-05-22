@@ -1,16 +1,9 @@
-
 export enum Position {
-  GK = 'Portero',
-  DEF = 'Defensa',
-  MID = 'Medio',
-  FWD = 'Delantero',
-  COACH = 'Mister'
-}
-
-export interface TeamConfig {
-  name: string;
-  primaryColor: string;
-  secondaryColor: string;
+  GK = 'GK',
+  DEF = 'DEF',
+  MID = 'MID',
+  FWD = 'FWD',
+  COACH = 'COACH'
 }
 
 export interface Player {
@@ -18,14 +11,13 @@ export interface Player {
   name: string;
   number: number;
   position: Position;
-  // Stats
   matchesPlayed: number;
   goals: number;
   assists: number;
   cleanSheets: number;
   totalPoints: number;
   averageRating: number;
-  form: number[]; // Last 5 ratings
+  form: number[];
 }
 
 export interface PlayerPerformance {
@@ -33,14 +25,28 @@ export interface PlayerPerformance {
   minutes: number;
   goals: number;
   assists: number;
-  rating: number; // User input 1-10
   yellowCard: boolean;
   redCard: boolean;
+  rating: number;
   manOfTheMatch: boolean;
+}
+
+export interface RivalTeam {
+  id: string;
+  name: string;
+}
+
+export interface League {
+  id: string;
+  name: string;
+  year: string;
+  teams: RivalTeam[];
+  isActive: boolean;
 }
 
 export interface MatchRecord {
   id: string;
+  leagueId: string;
   date: string;
   opponent: string;
   myScore: number;
@@ -48,6 +54,9 @@ export interface MatchRecord {
   performances: PlayerPerformance[];
 }
 
-
-
-
+export interface TeamConfig {
+  name: string;
+  primaryColor: string;
+  secondaryColor: string;
+  hasCustomRoster?: boolean;
+}

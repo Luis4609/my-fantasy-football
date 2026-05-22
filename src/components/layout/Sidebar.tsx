@@ -1,6 +1,7 @@
 import React from 'react';
-import { LayoutDashboard, Users, Trophy, History, PlusCircle, Settings, Shirt } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, History, PlusCircle, Settings, Shirt, LogOut } from 'lucide-react';
 import { TeamConfig } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
 export type View = 'dashboard' | 'roster' | 'leaderboard' | 'match_input' | 'history' | 'settings';
 
@@ -38,6 +39,8 @@ const NavItem: React.FC<NavItemProps> = ({ view, icon: Icon, label, currentView,
 );
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, teamConfig, setIsMobileMenuOpen, setSelectedMatch }) => {
+    const { logout } = useAuth();
+
     return (
         <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 p-6 sticky top-0 h-screen">
             <div className="flex items-center gap-3 mb-10 px-2">
@@ -61,16 +64,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, t
                 <div className="my-6 border-t border-slate-800"></div>
                 <button
                     onClick={() => setCurrentView('match_input')}
-                    className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-all ${currentView === 'match_input' ? 'bg-emerald-600 text-white' : 'text-emerald-400 hover:bg-emerald-500/10'}`}
+                    className={`flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-all cursor-pointer ${currentView === 'match_input' ? 'bg-emerald-600 text-white' : 'text-emerald-400 hover:bg-emerald-500/10'}`}
                 >
                     <PlusCircle size={20} />
                     <span className="font-bold">Add Match</span>
                 </button>
             </nav>
 
-            <div className="mt-auto border-t border-slate-800 pt-4">
+            <div className="mt-auto border-t border-slate-800 pt-4 space-y-2">
                 <NavItem view="settings" icon={Settings} label="Settings" currentView={currentView} setCurrentView={setCurrentView} teamConfig={teamConfig} setIsMobileMenuOpen={setIsMobileMenuOpen} setSelectedMatch={setSelectedMatch} />
+                <button
+                    onClick={logout}
+                    className="flex items-center gap-3 px-4 py-3 w-full rounded-xl transition-all text-rose-400 hover:bg-rose-500/10 cursor-pointer"
+                >
+                    <LogOut size={20} />
+                    <span>Log Out</span>
+                </button>
             </div>
         </aside>
     );
 };
+

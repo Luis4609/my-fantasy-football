@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
 import { Player, Position } from '../types';
-import { Activity, Target, Trophy, TrendingUp, Pencil, Check, X } from 'lucide-react';
+import { Activity, Target, Trophy, TrendingUp, Pencil, Check, X, User, AlertCircle } from 'lucide-react';
 
 interface PlayerCardProps {
   player: Player;
   onUpdate?: (id: string, data: Partial<Player>) => void;
+  isLinked?: boolean;
+  onLink?: () => void;
+  onSelect?: () => void;
+  roster?: Player[];
 }
 
-export const PlayerCard: React.FC<PlayerCardProps> = ({ player, onUpdate }) => {
+export const PlayerCard: React.FC<PlayerCardProps> = ({ player, onUpdate, isLinked = false, onLink, onSelect, roster }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<Player>>({});
+  const [error, setError] = useState<string | null>(null);
 
   const getPositionColor = (pos: Position) => {
     switch (pos) {
@@ -35,12 +40,87 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({ player, onUpdate }) => {
       cleanSheets: player.cleanSheets,
       totalPoints: player.totalPoints,
     });
+    setError(null);
     setIsEditing(true);
   };
 
   const handleSave = () => {
+    setError(null);
+
+    if (!editData.name || editData.name.trim() === '') {
+      setError("Name cannot be empty.");
+      return;
+    }
+    if (editData.name.length > 50) {
+      setError("Name must be 50 characters or less.");
+      return;
+    }
+
+    let finalNumber: number;
+    const rawNumber = editData.number;
+    if (rawNumber === undefined || rawNumber === null || rawNumber === '' || isNaN(Number(rawNumber))) {
+      if (roster) {
+        const existingNumbers = new Set(roster.filter(p => p.id !== player.id).map(p => p.number));
+        let found = 1;
+        for (let i = 1; i <= 99; i++) {
+          if (!existingNumbers.has(i)) {
+            found = i;
+            break;
+          }
+        }
+        finalNumber = found;
+      } else {
+        finalNumber = player.number;
+      }
+    } else {
+      const numVal = Number(rawNumber);
+      if (numVal < 1 || numVal > 99 || !Number.isInteger(numVal)) {
+        setError("Shirt number must be between 1 and 99.");
+        return;
+      }
+      finalNumber = numVal;
+    }
+
+    const matches = Number(editData.matchesPlayed);
+    if (isNaN(matches) || matches < 0 || !Number.isInteger(matches)) {
+      setError("Matches must be non-negative.");
+      return;
+    }
+
+    const goals = Number(editData.goals);
+    if (isNaN(goals) || goals < 0 || !Number.isInteger(goals)) {
+      setError("Goals must be non-negative.");
+      return;
+    }
+
+    const assists = Number(editData.assists);
+    if (isNaN(assists) || assists < 0 || !Number.isInteger(assists)) {
+      setError("Assists must be non-negative.");
+      return;
+    }
+
+    const cleanSheets = Number(editData.cleanSheets);
+    if (isNaN(cleanSheets) || cleanSheets < 0 || !Number.isInteger(cleanSheets)) {
+      setError("Clean sheets must be non-negative.");
+      return;
+    }
+
+    const points = Number(editData.totalPoints);
+    if (isNaN(points) || !Number.isInteger(points)) {
+      setError("Points must be an integer.");
+      return;
+    }
+
     if (onUpdate) {
-      onUpdate(player.id, editData);
+      onUpdate(player.id, {
+        ...editData,
+        number: finalNumber,
+        matchesPlayed: matches,
+        goals: goals,
+        assists: assists,
+        cleanSheets: cleanSheets,
+        totalPoints: points
+      });
     }
     setIsEditing(false);
   };
@@ -48,9 +128,11 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({ player, onUpdate }) => {
   const handleCancel = () => {
     setIsEditing(false);
     setEditData({});
+    setError(null);
   };
 
   const handleChange = (field: keyof Player, value: any) => {
+    setError(null);
     setEditData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -79,8 +161,8 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({ player, onUpdate }) => {
             </div>
             <input 
               type="number"
-              value={editData.number}
-              onChange={(e) => handleChange('number', parseInt(e.target.value))}
+              value={editData.number ?? ''}
+              onChange={(e) => handleChange('number', e.target.value !== '' ? parseInt(e.target.value) : '')}
               className="w-12 bg-slate-900 border border-slate-700 text-xl font-black text-center rounded px-1 py-1 text-slate-400 focus:ring-1 focus:ring-indigo-500 outline-none"
             />
           </div>
@@ -132,6 +214,12 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({ player, onUpdate }) => {
               />
             </div>
           </div>
+          {error && (
+            <div className="p-2 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] flex items-center gap-1.5 animate-pulse mt-2">
+              <AlertCircle size={12} className="shrink-0" />
+              <div className="font-semibold leading-tight">{error}</div>
+            </div>
+          )}
         </div>
 
         <div className="p-2 bg-slate-900/80 border-t border-slate-700 flex gap-2">
@@ -153,24 +241,51 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({ player, onUpdate }) => {
   }
 
   return (
-    <div className={`group relative flex flex-col rounded-xl border backdrop-blur-sm transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-black/20 overflow-hidden ${colorClass.replace('text-', 'border-')}`}>
-      {onUpdate && (
-        <button 
-          onClick={handleEditClick}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-800/50 text-slate-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-indigo-600 hover:text-white z-10"
-          title="Edit Player"
-        >
-          <Pencil size={14} />
-        </button>
-      )}
+    <div 
+      onClick={onSelect}
+      className={`group relative flex flex-col rounded-xl border backdrop-blur-sm transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-black/20 overflow-hidden cursor-pointer ${colorClass.replace('text-', 'border-')}`}
+    >
+      <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all z-10">
+        {onLink && (
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onLink();
+            }}
+            className={`p-1.5 rounded-full bg-slate-800/50 text-slate-400 hover:text-white transition-all ${isLinked ? 'hover:bg-red-600 text-indigo-400 bg-indigo-500/10' : 'hover:bg-indigo-600'}`}
+            title={isLinked ? "Unlink Account" : "Link as Me"}
+          >
+            <User size={14} />
+          </button>
+        )}
+        {onUpdate && (
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEditClick();
+            }}
+            className="p-1.5 rounded-full bg-slate-800/50 text-slate-400 hover:text-indigo-600 hover:text-white transition-all"
+            title="Edit Player"
+          >
+            <Pencil size={14} />
+          </button>
+        )}
+      </div>
 
       {/* Main Content */}
       <div className="p-4 flex-1">
         <div className="flex justify-between items-start mb-4">
           <div>
-             <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider ${colorClass}`}>
-              {player.position}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider ${colorClass}`}>
+                {player.position}
+              </span>
+              {isLinked && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-600/80 border border-indigo-500/50 text-white uppercase tracking-wider shadow-sm shadow-indigo-900/30">
+                  This is you
+                </span>
+              )}
+            </div>
             <h3 className="text-lg font-bold text-white mt-2 leading-tight">{player.name}</h3>
           </div>
           <span className="text-3xl font-black opacity-10 text-white">#{player.number}</span>

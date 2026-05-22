@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    volumes:
+      - db_data:/app/data
+    environment:
+      - PORT=3001
+      - DB_TYPE=sqlite
+      - SQLITE_DB_PATH=/app/data/database.sqlite
+      - JWT_SECRET=docker_compose_super_secret_secret_98765
+    restart: always
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:3001/api
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  db_data:

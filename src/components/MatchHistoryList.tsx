@@ -10,7 +10,34 @@ interface MatchHistoryListProps {
 
 type SortField = 'date' | 'myScore' | 'opponentScore';
 
-export const MatchHistoryList: React.FC<MatchHistoryListProps> = ({ matches, teamName, onSelectMatch }) => {
+interface SortButtonProps {
+  field: SortField;
+  label: string;
+  sortField: SortField;
+  sortDesc: boolean;
+  onSort: (field: SortField) => void;
+}
+
+const SortButton = ({ field, label, sortField, sortDesc, onSort }: SortButtonProps) => (
+  <button 
+    onClick={() => onSort(field)}
+    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${
+      sortField === field 
+        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
+        : 'text-slate-400 hover:text-white hover:bg-slate-700'
+    }`}
+  >
+    {label} 
+    <ArrowUpDown 
+      size={12} 
+      className={`transition-transform duration-200 ${
+        sortField === field ? 'opacity-100' : 'opacity-40'
+      } ${sortField === field && !sortDesc ? 'rotate-180' : ''}`} 
+    />
+  </button>
+);
+
+export const MatchHistoryList: React.FC<MatchHistoryListProps> = ({ matches, teamName: _teamName, onSelectMatch }) => {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDesc, setSortDesc] = useState(true);
 
@@ -47,34 +74,15 @@ export const MatchHistoryList: React.FC<MatchHistoryListProps> = ({ matches, tea
     }
   };
 
-  const SortButton = ({ field, label }: { field: SortField, label: string }) => (
-    <button 
-      onClick={() => handleSort(field)}
-      className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1 ${
-        sortField === field 
-          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
-          : 'text-slate-400 hover:text-white hover:bg-slate-700'
-      }`}
-    >
-      {label} 
-      <ArrowUpDown 
-        size={12} 
-        className={`transition-transform duration-200 ${
-          sortField === field ? 'opacity-100' : 'opacity-40'
-        } ${sortField === field && !sortDesc ? 'rotate-180' : ''}`} 
-      />
-    </button>
-  );
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-2">
         <h2 className="text-2xl font-bold text-white">Match History</h2>
         
         <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-700 gap-1">
-           <SortButton field="date" label="Date" />
-           <SortButton field="myScore" label="My Score" />
-           <SortButton field="opponentScore" label="Opp. Score" />
+           <SortButton field="date" label="Date" sortField={sortField} sortDesc={sortDesc} onSort={handleSort} />
+           <SortButton field="myScore" label="My Score" sortField={sortField} sortDesc={sortDesc} onSort={handleSort} />
+           <SortButton field="opponentScore" label="Opp. Score" sortField={sortField} sortDesc={sortDesc} onSort={handleSort} />
         </div>
       </div>
 
